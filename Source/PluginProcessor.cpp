@@ -12,7 +12,7 @@ MeridianProcessor::MeridianProcessor()
                           .withInput ("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                           .withInput ("Sidechain", juce::AudioChannelSet::stereo(), false)),
-      apvts (*this, nullptr, "MeridianEQ", params::createLayout())
+      apvts (*this, &undoManager, "MeridianEQ", params::createLayout())
 {
     for (int b = 0; b < meq::kNumBands; ++b)
         for (size_t s = 0; s < std::size (params::band::all); ++s)
@@ -308,6 +308,7 @@ meq::BandParams MeridianProcessor::readBand (int b) const
 void MeridianProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
+    state.setProperty ("preset", presets.currentName(), nullptr);
     if (auto xml = state.createXml()) copyXmlToBinary (*xml, destData);
 }
 
@@ -315,7 +316,13 @@ void MeridianProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
         if (xml->hasTagName (apvts.state.getType()))
-            apvts.replaceState (juce::ValueTree::fromXml (*xml));
+        {
+            auto tree = juce::ValueTree::fromXml (*xml);
+            presets.setCurrentName (tree.getProperty ("preset", "Init").toString());
+            tree.removeProperty ("preset", nullptr);
+            apvts.replaceState (tree);
+            undoManager.clearUndoHistory();
+        }
 }
 
 juce::AudioProcessorEditor* MeridianProcessor::createEditor()

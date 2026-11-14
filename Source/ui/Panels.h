@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Controls.h"
+#include "FilterIcons.h"
+#include "../dsp/EqEngine.h"
 
 class MeridianProcessor;
 
@@ -11,19 +13,49 @@ public:
     void paintPanel (juce::Graphics& g);
 };
 
+/** Preset name with previous / next, a menu and save. */
+class PresetBar : public juce::Component
+{
+public:
+    explicit PresetBar (MeridianProcessor&);
+    void paint (juce::Graphics&) override;
+    void resized() override;
+    void mouseDown (const juce::MouseEvent&) override;
+
+private:
+    void showMenu();
+    void saveAs();
+    void loadFromFile();
+
+    MeridianProcessor& proc;
+    IconButton prev { "Previous preset", icons::chevronLeft() };
+    IconButton next { "Next preset", icons::chevronRight() };
+    IconButton save { "Save preset", icons::save() };
+    juce::Rectangle<int> nameArea;
+    std::unique_ptr<juce::FileChooser> chooser;
+};
+
 class HeaderBar : public juce::Component
 {
 public:
     explicit HeaderBar (MeridianProcessor&);
     void paint (juce::Graphics&) override;
     void resized() override;
+    void mouseDown (const juce::MouseEvent&) override { if (onBackgroundClick) onBackgroundClick(); }
 
-    std::function<void()> onSettings;
+    /** Refresh undo / redo availability and the preset name. */
+    void update();
+
+    std::function<void()> onSettings, onUndo, onRedo, onBackgroundClick;
 
 private:
+    MeridianProcessor& proc;
+    IconButton undo { "Undo (Ctrl/Cmd+Z)", icons::undo() };
+    IconButton redo { "Redo (Ctrl/Cmd+Shift+Z)", icons::redo() };
+    PresetBar presetBar;
     SegmentedControl phase { { "Zero Latency", "Analog", "Linear", "Mixed" } };
     juce::ToggleButton oversampling { juce::String (juce::CharPointer_UTF8 ("2\xc3\x97 Oversampling")) };
-    IconButton settings { "GUI settings", icons::gear() };
+    IconButton settings { "Options", icons::gear() };
     std::unique_ptr<juce::ButtonParameterAttachment> osAttachment;
 };
 
@@ -41,6 +73,7 @@ private:
     struct Chip { int band; juce::Rectangle<float> r; };
     std::vector<Chip> layoutChips() const;
     juce::Rectangle<float> addButtonArea (const std::vector<Chip>&) const;
+    static juce::String chipLabel (int band, const meq::BandParams&);
 
     MeridianProcessor& proc;
 };
@@ -59,13 +92,12 @@ public:
 private:
     MeridianProcessor& proc;
     int band = -1;
-    juce::ComboBox type;
+    TypeSelector type;
     Knob freq { "Frequency" }, gain { "Gain", false, true }, q { "Q" }, slope { "Slope" };
     SegmentedControl channel { { "Stereo", "L", "R", "M", "S" } };
     juce::TextButton solo { "S" };
     IconButton bypass { "Bypass band", icons::power() };
     IconButton remove { "Delete band", icons::cross() };
-    std::unique_ptr<juce::ComboBoxParameterAttachment> typeAttachment;
     std::unique_ptr<juce::ButtonParameterAttachment> bypassAttachment;
 };
 
@@ -100,6 +132,11 @@ public:
     void update();
     void paint (juce::Graphics&) override;
     void resized() override;
+    void mouseDown (const juce::MouseEvent&) override { if (onBackgroundClick) onBackgroundClick(); }
+
+    /** Set by the editor: which renderer is drawing the interface right now. */
+    std::function<juce::String()> rendererName;
+    std::function<void()> onBackgroundClick;
 
 private:
     MeridianProcessor& proc;
@@ -109,8 +146,4 @@ private:
     SegmentedControl monitor { { "Off", "Mid", "Side" } };
     std::unique_ptr<juce::ButtonParameterAttachment> autoAttachment;
     juce::String status;
-
-public:
-    /** Set by the editor: which renderer is drawing the interface right now. */
-    std::function<juce::String()> rendererName;
 };

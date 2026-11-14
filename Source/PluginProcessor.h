@@ -5,6 +5,7 @@
 
 #include "AnalyzerFifo.h"
 #include "Params.h"
+#include "PresetManager.h"
 #include "dsp/EqEngine.h"
 
 class MeridianProcessor : public juce::AudioProcessor
@@ -39,7 +40,9 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
     // ---- used by the editor (message thread)
+    juce::UndoManager undoManager;
     juce::AudioProcessorValueTreeState apvts;
+    PresetManager presets { *this };
     AnalyzerFifo preFifo, postFifo, sidechainFifo;
 
     /** Band being auditioned (-1 = none). Written by the editor. */

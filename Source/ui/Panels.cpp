@@ -12,9 +12,133 @@ void PanelBase::paintPanel (juce::Graphics& g)
     g.drawRoundedRectangle (r, 12.0f, 1.0f);
 }
 
-// ================================================================== HeaderBar
-HeaderBar::HeaderBar (MeridianProcessor& p)
+// ================================================================== PresetBar
+PresetBar::PresetBar (MeridianProcessor& p) : proc (p)
 {
+    prev.onClick = [this] { proc.presets.step (-1); repaint(); };
+    next.onClick = [this] { proc.presets.step (1); repaint(); };
+    save.onClick = [this]
+    {
+        const auto& e = proc.presets.currentEntry();
+        if (! e.factory && e.file.existsAsFile()) proc.presets.save (e.file);
+        else saveAs();
+        repaint();
+    };
+    for (auto* b : { &prev, &next, &save }) addAndMakeVisible (*b);
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+}
+
+void PresetBar::resized()
+{
+    auto r = getLocalBounds();
+    save.setBounds (r.removeFromRight (30));
+    r.removeFromRight (6);
+    next.setBounds (r.removeFromRight (26));
+    prev.setBounds (r.removeFromLeft (26));
+    nameArea = r.reduced (4, 0);
+}
+
+void PresetBar::paint (juce::Graphics& g)
+{
+    const auto r = nameArea.toFloat().reduced (0.5f);
+    g.setColour (theme::well);
+    g.fillRoundedRectangle (r, 7.0f);
+    g.setColour (theme::border2);
+    g.drawRoundedRectangle (r, 7.0f, 1.0f);
+    g.setColour (theme::text);
+    g.setFont (theme::font (13.0f, true));
+    g.drawText (proc.presets.currentName(), nameArea.reduced (10, 0).withTrimmedRight (14), juce::Justification::centredLeft);
+    juce::Path arrow;
+    const float ax = (float) nameArea.getRight() - 12.0f, ay = (float) nameArea.getCentreY();
+    arrow.startNewSubPath (ax - 4.0f, ay - 2.0f);
+    arrow.lineTo (ax, ay + 2.0f);
+    arrow.lineTo (ax + 4.0f, ay - 2.0f);
+    g.setColour (theme::muted);
+    g.strokePath (arrow, juce::PathStrokeType (1.5f));
+}
+
+void PresetBar::mouseDown (const juce::MouseEvent& e)
+{
+    if (nameArea.contains (e.getPosition())) showMenu();
+}
+
+void PresetBar::showMenu()
+{
+    const auto all = proc.presets.list();
+    const auto& cur = proc.presets.currentEntry();
+    juce::PopupMenu factory, user, menu;
+    for (int i = 0; i < (int) all.size(); ++i)
+    {
+        const auto& e = all[(size_t) i];
+        const bool ticked = e.factory == cur.factory && (e.factory ? e.factoryIndex == cur.factoryIndex : e.file == cur.file);
+        (e.factory ? factory : user).addItem (1000 + i, e.name, true, ticked);
+    }
+    menu.addSectionHeader ("Presets");
+    menu.addSubMenu ("Factory", factory);
+    if (user.getNumItems() > 0) { menu.addSeparator(); menu.addSectionHeader ("Yours"); menu.addSubMenu ("User presets", user); }
+    menu.addSeparator();
+    menu.addItem (1, "Save", true);
+    menu.addItem (2, juce::String (juce::CharPointer_UTF8 ("Save as\xe2\x80\xa6")));
+    menu.addItem (3, juce::String (juce::CharPointer_UTF8 ("Load from file\xe2\x80\xa6")));
+    menu.addItem (4, "Show presets folder");
+    menu.addSeparator();
+    menu.addItem (5, "Init (all bands off)");
+
+    juce::Component::SafePointer<PresetBar> safe (this);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this), [safe, all] (int r)
+    {
+        if (safe == nullptr || r == 0) return;
+        auto& pm = safe->proc.presets;
+        if (r >= 1000) pm.load (all[(size_t) (r - 1000)]);
+        else if (r == 1) safe->save.onClick();
+        else if (r == 2) safe->saveAs();
+        else if (r == 3) safe->loadFromFile();
+        else if (r == 4) PresetManager::folder().revealToUser();
+        else if (r == 5) pm.loadInit();
+        safe->repaint();
+    });
+}
+
+void PresetBar::saveAs()
+{
+    const auto start = PresetManager::folder().getChildFile (proc.presets.currentEntry().factory ? "My preset" : proc.presets.currentName())
+                           .withFileExtension (PresetManager::extension);
+    chooser = std::make_unique<juce::FileChooser> ("Save preset", start, juce::String ("*") + PresetManager::extension);
+    juce::Component::SafePointer<PresetBar> safe (this);
+    chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
+                              | juce::FileBrowserComponent::warnAboutOverwriting,
+                          [safe] (const juce::FileChooser& fc)
+                          {
+                              if (safe == nullptr) return;
+                              const auto f = fc.getResult();
+                              if (f != juce::File()) safe->proc.presets.save (f);
+                              safe->repaint();
+                          });
+}
+
+void PresetBar::loadFromFile()
+{
+    chooser = std::make_unique<juce::FileChooser> ("Load preset", PresetManager::folder(), juce::String ("*") + PresetManager::extension);
+    juce::Component::SafePointer<PresetBar> safe (this);
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                          [safe] (const juce::FileChooser& fc)
+                          {
+                              if (safe == nullptr) return;
+                              const auto f = fc.getResult();
+                              if (f.existsAsFile()) safe->proc.presets.loadFile (f);
+                              safe->repaint();
+                          });
+}
+
+// ================================================================== HeaderBar
+HeaderBar::HeaderBar (MeridianProcessor& p) : proc (p), presetBar (p)
+{
+    undo.onClick = [this] { if (onUndo) onUndo(); };
+    redo.onClick = [this] { if (onRedo) onRedo(); };
+    addAndMakeVisible (undo);
+    addAndMakeVisible (redo);
+    addAndMakeVisible (presetBar);
+
     phase.attach (p.apvts.getParameter (params::phase));
     phase.setOptionEnabled (2, false);
     phase.setOptionEnabled (3, false);
@@ -30,6 +154,13 @@ HeaderBar::HeaderBar (MeridianProcessor& p)
     addAndMakeVisible (settings);
 }
 
+void HeaderBar::update()
+{
+    undo.setEnabled (proc.undoManager.canUndo());
+    redo.setEnabled (proc.undoManager.canRedo());
+    presetBar.repaint();
+}
+
 void HeaderBar::paint (juce::Graphics& g)
 {
     g.setColour (theme::line);
@@ -43,10 +174,7 @@ void HeaderBar::paint (juce::Graphics& g)
     g.strokePath (logo, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     g.setColour (theme::text);
     g.setFont (theme::font (15.0f, true));
-    g.drawText ("Meridian EQ", 46, 0, 140, getHeight(), juce::Justification::centredLeft);
-    g.setColour (theme::muted);
-    g.setFont (theme::font (11.0f));
-    g.drawText ("prototype", 150, 0, 80, getHeight(), juce::Justification::centredLeft);
+    g.drawText ("Meridian EQ", 46, 0, 120, getHeight(), juce::Justification::centredLeft);
 
     theme::caption (g, "Phase", phase.getBounds().translated (-56, 0).withWidth (50), juce::Justification::centredRight);
 }
@@ -54,14 +182,30 @@ void HeaderBar::paint (juce::Graphics& g)
 void HeaderBar::resized()
 {
     auto r = getLocalBounds().reduced (16, 10);
+    r.removeFromLeft (150);
+    undo.setBounds (r.removeFromLeft (30));
+    r.removeFromLeft (4);
+    redo.setBounds (r.removeFromLeft (30));
+    r.removeFromLeft (14);
+    presetBar.setBounds (r.removeFromLeft (290));
+
     settings.setBounds (r.removeFromRight (32));
     r.removeFromRight (10);
-    oversampling.setBounds (r.removeFromRight (150));
-    phase.setBounds (juce::Rectangle<int> (360, 32).withCentre ({ getWidth() / 2 + 20, getHeight() / 2 }));
+    oversampling.setBounds (r.removeFromRight (148));
+    r.removeFromRight (12);
+    r.removeFromLeft (62); // room for the "Phase" caption
+    phase.setBounds (r.withSizeKeepingCentre (juce::jmin (r.getWidth(), 340), r.getHeight()));
 }
 
 // ================================================================== BandStrip
 BandStrip::BandStrip (MeridianProcessor& p) : proc (p) {}
+
+juce::String BandStrip::chipLabel (int b, const meq::BandParams& d)
+{
+    juce::String label = juce::String (b + 1) + "   " + meq::filterTypeShort (d.type);
+    if (d.channel != meq::Channel::Stereo) label << " " << params::channels[(int) d.channel];
+    return label;
+}
 
 std::vector<BandStrip::Chip> BandStrip::layoutChips() const
 {
@@ -72,10 +216,8 @@ std::vector<BandStrip::Chip> BandStrip::layoutChips() const
     {
         const auto d = proc.readBand (b);
         if (! d.enabled) continue;
-        juce::String label = juce::String (b + 1) + " " + meq::filterTypeShort (d.type);
-        if (d.channel != meq::Channel::Stereo) label << " " << params::channels[(int) d.channel];
-        const float w = (float) juce::GlyphArrangement::getStringWidthInt (f, label) + (d.dynOn ? 28.0f : 20.0f);
-        if (x + w > (float) getWidth() - 120.0f) break;
+        const float w = (float) juce::GlyphArrangement::getStringWidthInt (f, chipLabel (b, d)) + 46.0f + (d.dynOn ? 8.0f : 0.0f);
+        if (x + w > (float) getWidth() - 130.0f) break;
         chips.push_back ({ b, { x, 8.0f, w, (float) getHeight() - 16.0f } });
         x += w + 6.0f;
     }
@@ -98,7 +240,6 @@ void BandStrip::paint (juce::Graphics& g)
     theme::caption (g, "Bands " + juce::String (count) + " / 32", { 16, 0, 100, getHeight() });
 
     const auto chips = layoutChips();
-    g.setFont (theme::font (11.0f, true));
     for (const auto& c : chips)
     {
         const auto d = proc.readBand (c.band);
@@ -108,14 +249,25 @@ void BandStrip::paint (juce::Graphics& g)
         g.fillRoundedRectangle (c.r, 7.0f);
         g.setColour (on ? col : col.withAlpha (0.55f));
         g.drawRoundedRectangle (c.r, 7.0f, 1.0f);
-        juce::String label = juce::String (c.band + 1) + " " + meq::filterTypeShort (d.type);
-        if (d.channel != meq::Channel::Stereo) label << " " << params::channels[(int) d.channel];
-        g.setColour (on ? theme::onAccent : (d.bypass ? theme::faint : theme::textDim));
-        g.drawText (label, c.r.withTrimmedLeft (10).withTrimmedRight (d.dynOn ? 18 : 10), juce::Justification::centredLeft);
+
+        const auto textCol = on ? theme::on (col) : (d.bypass ? theme::faint : theme::textDim);
+        auto inner = c.r.reduced (9.0f, 0.0f);
+        g.setFont (theme::font (11.0f, true));
+        g.setColour (textCol);
+        const auto num = juce::String (c.band + 1);
+        const float nw = (float) juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), num);
+        g.drawText (num, inner.removeFromLeft (nw + 2), juce::Justification::centredLeft);
+        inner.removeFromLeft (5);
+        filtericons::draw (g, d.type, inner.removeFromLeft (22).reduced (0, 9), on ? theme::on (col) : col, 1.3f);
+        inner.removeFromLeft (6);
+        juce::String rest = meq::filterTypeShort (d.type);
+        if (d.channel != meq::Channel::Stereo) rest << " " << params::channels[(int) d.channel];
+        g.setColour (textCol);
+        g.drawText (rest, inner.withTrimmedRight (d.dynOn ? 9 : 0), juce::Justification::centredLeft);
         if (d.dynOn)
         {
             g.setColour (theme::amber);
-            g.fillEllipse (c.r.getRight() - 13.0f, c.r.getCentreY() - 2.5f, 5.0f, 5.0f);
+            g.fillEllipse (c.r.getRight() - 12.0f, c.r.getCentreY() - 2.5f, 5.0f, 5.0f);
         }
     }
 
@@ -127,6 +279,7 @@ void BandStrip::paint (juce::Graphics& g)
     g.setColour (theme::faint);
     g.fillPath (dashed);
     g.setColour (theme::textDim);
+    g.setFont (theme::font (11.0f, true));
     g.drawText ("+ Add band", add, juce::Justification::centred);
 
     g.setColour (theme::muted);
@@ -144,18 +297,17 @@ void BandStrip::mouseDown (const juce::MouseEvent& e)
     {
         const int b = proc.addBand (meq::FilterType::Bell, 1000.0f, 0.0f, 1.0f);
         if (b >= 0 && onSelect) onSelect (b);
+        return;
     }
+    if (onSelect) onSelect (-1); // empty space: deselect
 }
 
 // ================================================================== BandPanel
 BandPanel::BandPanel (MeridianProcessor& p) : proc (p)
 {
-    type.addItemList (params::filterTypeNames(), 1);
     addAndMakeVisible (type);
     for (auto* k : { &freq, &gain, &q, &slope }) addAndMakeVisible (*k);
     addAndMakeVisible (channel);
-    channel.setOptionColours ({ theme::channelColour (0), theme::channelColour (1), theme::channelColour (2),
-                                theme::channelColour (3), theme::channelColour (4) });
 
     solo.setClickingTogglesState (true);
     solo.setTooltip ("Audition: hear only this band's range (same as the speaker above the band's dot)");
@@ -182,16 +334,15 @@ BandPanel::BandPanel (MeridianProcessor& p) : proc (p)
 void BandPanel::setBand (int b)
 {
     band = b;
-    typeAttachment.reset();
     bypassAttachment.reset();
     const bool valid = b >= 0;
     for (juce::Component* c : { (juce::Component*) &type, (juce::Component*) &freq, (juce::Component*) &gain, (juce::Component*) &q,
                                 (juce::Component*) &slope, (juce::Component*) &channel, (juce::Component*) &solo,
                                 (juce::Component*) &bypass, (juce::Component*) &remove })
         c->setVisible (valid);
-    if (! valid) { repaint(); return; }
+    if (! valid) { type.detach(); repaint(); return; }
 
-    typeAttachment = std::make_unique<juce::ComboBoxParameterAttachment> (*proc.bandParam (b, pb::type), type, nullptr);
+    type.attach (proc.bandParam (b, pb::type));
     bypassAttachment = std::make_unique<juce::ButtonParameterAttachment> (*proc.bandParam (b, pb::bypass), bypass, nullptr);
     freq.attach (proc.bandParam (b, pb::freq));
     gain.attach (proc.bandParam (b, pb::gain));
@@ -204,11 +355,14 @@ void BandPanel::setBand (int b)
 
 void BandPanel::update()
 {
+    channel.setOptionColours ({ theme::channelColour (0), theme::channelColour (1), theme::channelColour (2),
+                                theme::channelColour (3), theme::channelColour (4) });
     if (band < 0) return;
     const auto t = (meq::FilterType) juce::roundToInt (proc.bandValue (band, pb::type));
     gain.setEnabled (meq::typeUsesGain (t));
     slope.setEnabled (meq::typeUsesSlope (t));
     solo.setToggleState (proc.lockedSolo == band, juce::dontSendNotification);
+    type.setColour (theme::channelColour (juce::roundToInt (proc.bandValue (band, pb::channel))));
 }
 
 void BandPanel::paint (juce::Graphics& g)
@@ -231,12 +385,13 @@ void BandPanel::resized()
     auto r = getLocalBounds().reduced (16, 14);
     auto top = r.removeFromTop (30);
     top.removeFromLeft (74);
-    type.setBounds (top.removeFromLeft (170));
     remove.setBounds (top.removeFromRight (30));
     top.removeFromRight (6);
     bypass.setBounds (top.removeFromRight (30));
     top.removeFromRight (6);
     solo.setBounds (top.removeFromRight (30));
+    top.removeFromRight (10);
+    type.setBounds (top.withWidth (juce::jmin (top.getWidth(), 220)));
 
     r.removeFromTop (8);
     auto bottom = r.removeFromBottom (32);
@@ -304,6 +459,10 @@ void DynamicsPanel::update()
         detQ.setEnabled (det != 0);
         if (show && det == 2 && ! proc.sidechainConnected())
             newNote = "No sidechain signal: route a track to Meridian EQ's sidechain input in your DAW.";
+    }
+    else
+    {
+        newNote = "Select a band to edit its dynamics.";
     }
     if (show != showControls || newNote != note)
     {

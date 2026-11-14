@@ -1,4 +1,4 @@
-# Meridian EQ — prototype 0.1.1
+# Meridian EQ — prototype 0.2.0
 
 A 32-band parametric / dynamic EQ plugin (VST3 on Windows and macOS, AU on
 macOS) with a GPU-drawn interface. This is the first working prototype: the
@@ -20,6 +20,17 @@ below).
 3. Rescan plugins in your DAW. It shows up as an effect called **Meridian EQ**.
 
 ## Using it
+
+- **Presets**: the preset field in the header. Arrows step through all
+  presets; click the name for the list (7 factory presets plus yours), Save,
+  Save as, Load from file, Show presets folder and Init. Your presets are
+  `.mepreset` files in `Documents/Meridian EQ/Presets`.
+- **Undo / redo**: the arrows left of the preset field, or Ctrl/Cmd+Z and
+  Ctrl/Cmd+Shift+Z (Ctrl+Y). Every click starts a new step, so a whole drag
+  undoes at once. Loading a preset clears the history.
+- **Select / deselect**: click a dot or a band chip to select it; click
+  empty space in the display, the band strip, the header, the Global panel or
+  between panels (or press Esc) to deselect.
 
 - **Add a band**: double-click the display (a bell at that spot), click
   **+ Add band**, or *Spectrum Grab*: move the mouse near a peak in the
@@ -43,8 +54,9 @@ below).
   smooth curves (no corners), with fast rise and slower fall.
 - **Hover** anywhere for frequency, analyzer level and EQ gain at that point.
   Click the dB scale on the right to switch between ±6, ±12, ±18 and ±30 dB.
-- **Per band**: 15 filter types, slope 6–96 dB/oct for the cut filters,
-  Stereo / L / R / Mid / Side processing.
+- **Per band**: 15 filter types, each shown with an icon of its curve (in the
+  type picker, the right-click menu and the band strip), slope 6–96 dB/oct for
+  the cut filters, Stereo / L / R / Mid / Side processing.
 - **Dynamics** (any band type that has gain): threshold, range (the most the
   band moves, negative = cut, positive = boost), ratio, attack, release.
   - *Above / Below / Two-way*: react over the threshold, under it, or both
@@ -59,10 +71,20 @@ below).
 - **Global**: gain scale (−200…200 %), stereo width, output, lookahead
   (dynamics see the signal before it is processed), auto gain, M/S monitor,
   2× oversampling, phase mode.
-- **Settings** (gear): spectrum refresh rate, resolution, brightness, EQ
-  scale, and the renderer: **GPU (OpenGL)** (default) or **CPU (software)**.
-  The status line in the Global panel shows which one is drawing. Saved with
-  the session, like the window size.
+- **Options** (gear, top right): a panel slides in from the right with
+  - Display: spectrum refresh rate (default 60 fps), resolution (default
+    High), brightness, EQ scale.
+  - Interface: size 80 / 100 / 125 / 150 / 175 / 200 %, and the renderer:
+    **GPU (OpenGL)** (default) or **CPU (software)**. The status line in the
+    Global panel shows which one is drawing.
+  - Colour presets: Graphite, Midnight, Nordic Frost, Obsidian Gold, Rose
+    Quartz, Forest, Neon Noir, Solar Ember, Sandstone and Arctic (the last two
+    are light themes).
+  - Custom colours: click any swatch (background, panels, display, text,
+    accent, dynamics, each channel colour, and the two ends of the spectrum
+    gradient) to pick a colour; spectrum fill opacity; reset to the preset.
+  These options are saved for all instances (in the plugin's settings file,
+  not in the session), like the window size.
 
 ### Sidechain in your DAW
 
@@ -89,7 +111,8 @@ band's detection to **Sidechain**.
 | External sidechain | Yes |
 | Per-band L / R / M / S, width, M/S monitor | Yes |
 | Spectrum Grab, audition, hover readout | Yes |
-| OpenGL GUI, themes, refresh rate, resolution, brightness | OpenGL rendering, refresh rate, resolution, brightness yes; one theme so far |
+| OpenGL GUI, themes, refresh rate, resolution, brightness | Yes: GPU or CPU renderer, 10 colour presets plus custom colours and spectrum gradient, interface sizes |
+| Presets, undo / redo | Yes |
 | 2× oversampling, lookahead, auto gain, gain scale | Yes |
 | Hand-written assembly | No (plain C++; about 3 % of one core for 32 bands with 16 dynamic at 48 kHz) |
 

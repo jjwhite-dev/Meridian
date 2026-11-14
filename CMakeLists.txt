@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(MeridianEQ VERSION 0.1.1 LANGUAGES C CXX)
+project(MeridianEQ VERSION 0.2.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -48,7 +48,7 @@ juce_add_plugin(MeridianEQ
     NEEDS_MIDI_INPUT FALSE
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
-    EDITOR_WANTS_KEYBOARD_FOCUS FALSE
+    EDITOR_WANTS_KEYBOARD_FOCUS TRUE
     COPY_PLUGIN_AFTER_BUILD FALSE
     AU_MAIN_TYPE kAudioUnitType_Effect
     VST3_CATEGORIES Fx EQ)
@@ -57,11 +57,16 @@ target_sources(MeridianEQ PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
     Source/Params.cpp
+    Source/PresetManager.cpp
     Source/dsp/EqEngine.cpp
     Source/ui/LookAndFeel.cpp
     Source/ui/Controls.cpp
     Source/ui/EqDisplay.cpp
-    Source/ui/Panels.cpp)
+    Source/ui/Panels.cpp
+    Source/ui/Theme.cpp
+    Source/ui/GlobalSettings.cpp
+    Source/ui/FilterIcons.cpp
+    Source/ui/SettingsPanel.cpp)
 
 target_include_directories(MeridianEQ PRIVATE Source)
 

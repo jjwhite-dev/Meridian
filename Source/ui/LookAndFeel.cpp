@@ -3,6 +3,11 @@
 
 MeridianLookAndFeel::MeridianLookAndFeel()
 {
+    applyTheme();
+}
+
+void MeridianLookAndFeel::applyTheme()
+{
     setColour (juce::ResizableWindow::backgroundColourId, theme::bg);
     setColour (juce::ComboBox::backgroundColourId, theme::well);
     setColour (juce::ComboBox::outlineColourId, theme::border2);
@@ -113,9 +118,9 @@ void MeridianLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButto
     }
 
     // pill toggle with a status dot
-    g.setColour (on ? juce::Colour (0xff16222a) : theme::panel);
+    g.setColour (on ? theme::banner : theme::panel);
     g.fillRoundedRectangle (r.reduced (0.5f), 8.0f);
-    g.setColour (on ? juce::Colour (0xff2b4b5c) : (highlighted ? theme::border2 : theme::border));
+    g.setColour (on ? theme::accent.withAlpha (0.45f) : (highlighted ? theme::border2 : theme::border));
     g.drawRoundedRectangle (r.reduced (0.5f), 8.0f, 1.0f);
     g.setColour (on ? theme::accent : theme::faint);
     g.fillEllipse (12.0f, r.getCentreY() - 3.0f, 6.0f, 6.0f);

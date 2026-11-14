@@ -1,114 +1,97 @@
 #include "PluginEditor.h"
 
-namespace
-{
-    // GUI settings live in the plugin state (saved with the session)
-    constexpr const char* kRefresh = "uiRefresh";   // Hz
-    constexpr const char* kFftOrder = "uiFft";      // 11..14
-    constexpr const char* kBright = "uiBright";     // 0.5..1.5
-    constexpr const char* kGpu = "uiGpu";           // bool: draw the editor with OpenGL
-    constexpr const char* kRange = "uiRange";       // dB
-    constexpr const char* kWidth = "uiW";
-    constexpr const char* kHeight = "uiH";
-}
-
 MeridianEditor::MeridianEditor (MeridianProcessor& p)
-    : AudioProcessorEditor (p), proc (p), header (p), display (p), strip (p), bandPanel (p), dynamicsPanel (p), globalPanel (p)
+    : AudioProcessorEditor (p), proc (p), header (p), display (p), strip (p), bandPanel (p), dynamicsPanel (p),
+      globalPanel (p), settingsPanel (*settings)
 {
     setLookAndFeel (&lnf);
+    setWantsKeyboardFocus (true);
 
-    // GPU rendering: the whole editor is drawn through OpenGL (can be switched off in the settings menu)
+    // GPU rendering: the whole editor is drawn through OpenGL (can be switched off in the options)
     glContext.setComponentPaintingEnabled (true);
     glContext.setContinuousRepainting (false);
     globalPanel.rendererName = [this] { return glContext.isAttached() ? juce::String ("OpenGL") : juce::String ("CPU renderer"); };
 
-    header.onSettings = [this] { showSettings(); };
+    header.onSettings = [this] { settingsPanel.isOpen() ? settingsPanel.close() : settingsPanel.open(); };
+    header.onUndo = [this] { undo(); };
+    header.onRedo = [this] { redo(); };
+    header.onBackgroundClick = [this] { selectBand (-1); };
+    globalPanel.onBackgroundClick = [this] { selectBand (-1); };
+    root.onBackgroundClick = [this] { selectBand (-1); };
     display.onSelect = [this] (int b) { selectBand (b); };
+    display.onDbRangeChange = [this] (float r) { settings->dbRange = r; settings->changed(); };
     strip.onSelect = [this] (int b) { selectBand (b); };
     bandPanel.onSelect = [this] (int b) { selectBand (b); };
 
+    addAndMakeVisible (root);
     for (juce::Component* c : { (juce::Component*) &header, (juce::Component*) &display, (juce::Component*) &strip,
                                 (juce::Component*) &bandPanel, (juce::Component*) &dynamicsPanel, (juce::Component*) &globalPanel })
-        addAndMakeVisible (c);
+        root.addAndMakeVisible (c);
+    root.addChildComponent (settingsPanel);
+    root.onResize = [this] { layoutRoot(); };
 
-    // start on the first band that is on, if any
+    // every click starts a new undo step; listen to clicks anywhere in the editor
+    addMouseListener (this, true);
+
     for (int b = 0; b < meq::kNumBands; ++b)
         if (proc.bandValue (b, params::band::on) > 0.5f) { selectBand (b); break; }
 
     setResizable (true, true);
-    setResizeLimits (1000, 660, 2560, 1600);
-    const auto& st = proc.apvts.state;
-    setSize ((int) st.getProperty (kWidth, 1240), (int) st.getProperty (kHeight, 800));
+    settings->addChangeListener (this);
     applySettings();
 }
 
 MeridianEditor::~MeridianEditor()
 {
+    settings->removeChangeListener (this);
     stopTimer();
+    removeMouseListener (this);
     if (glContext.isAttached()) glContext.detach();
     setLookAndFeel (nullptr);
 }
 
+void MeridianEditor::changeListenerCallback (juce::ChangeBroadcaster*)
+{
+    applySettings();
+}
+
 void MeridianEditor::applySettings()
 {
-    const auto& st = proc.apvts.state;
-    display.setAnalyzerOrder ((int) st.getProperty (kFftOrder, 12));
-    display.setBrightness ((float) (double) st.getProperty (kBright, 1.0));
-    setGpuRendering ((bool) st.getProperty (kGpu, true));
-    display.setDbRange ((float) (double) st.getProperty (kRange, 18.0));
-    startTimerHz (juce::jlimit (15, 144, (int) st.getProperty (kRefresh, 60)));
+    auto& s = *settings;
+    lnf.applyTheme();
+
+    if (s.fftOrder != appliedFftOrder) { display.setAnalyzerOrder (s.fftOrder); appliedFftOrder = s.fftOrder; }
+    display.setBrightness (s.brightness);
+    display.setDbRange (s.dbRange);
+    if (s.refreshHz != appliedRefresh) { startTimerHz (juce::jlimit (15, 144, s.refreshHz)); appliedRefresh = s.refreshHz; }
+    setGpuRendering (s.gpu);
+
+    if (std::abs (s.uiScale - appliedScale) > 0.001f)
+    {
+        appliedScale = s.uiScale;
+        const auto sc = appliedScale;
+        resizingFromScale = true;
+        setResizeLimits (juce::roundToInt (minLogicalW * sc), juce::roundToInt (minLogicalH * sc),
+                         juce::roundToInt (3200 * sc), juce::roundToInt (2000 * sc));
+        setSize (juce::roundToInt (juce::jmax (minLogicalW, s.logicalWidth) * sc),
+                 juce::roundToInt (juce::jmax (minLogicalH, s.logicalHeight) * sc));
+        resizingFromScale = false;
+        resized();
+    }
+
+    // repaint everything in the new colours
+    std::function<void (juce::Component&)> repaintAll = [&] (juce::Component& c)
+    {
+        c.repaint();
+        for (auto* child : c.getChildren()) repaintAll (*child);
+    };
+    repaintAll (*this);
 }
 
 void MeridianEditor::setGpuRendering (bool shouldUseGpu)
 {
     if (shouldUseGpu && ! glContext.isAttached()) glContext.attachTo (*this);
     else if (! shouldUseGpu && glContext.isAttached()) glContext.detach();
-    repaint();
-}
-
-void MeridianEditor::showSettings()
-{
-    auto& st = proc.apvts.state;
-    const int refresh = st.getProperty (kRefresh, 60);
-    const int order = st.getProperty (kFftOrder, 12);
-    const double bright = st.getProperty (kBright, 1.0);
-    const bool gpu = st.getProperty (kGpu, true);
-    const double range = st.getProperty (kRange, 18.0);
-
-    juce::PopupMenu rate, res, light, scale, menu;
-    for (int hz : { 30, 60, 120 }) rate.addItem (100 + hz, juce::String (hz) + " fps", true, refresh == hz);
-    const char* resNames[] = { "Low (2048)", "Medium (4096)", "High (8192)", "Ultra (16384)" };
-    for (int o = 11; o <= 14; ++o) res.addItem (200 + o, resNames[o - 11], true, order == o);
-    const double levels[] = { 0.5, 0.75, 1.0, 1.5 };
-    for (int i = 0; i < 4; ++i) light.addItem (300 + i, juce::String (juce::roundToInt (levels[i] * 100)) + "%", true, std::abs (bright - levels[i]) < 0.01);
-    const int ranges[] = { 6, 12, 18, 30 };
-    for (int i = 0; i < 4; ++i)
-        scale.addItem (400 + i, juce::String (juce::CharPointer_UTF8 ("\xc2\xb1")) + juce::String (ranges[i]) + " dB", true, std::abs (range - ranges[i]) < 0.1);
-
-    menu.addSectionHeader ("Display");
-    menu.addSubMenu ("Spectrum refresh rate", rate);
-    menu.addSubMenu ("Spectrum resolution", res);
-    menu.addSubMenu ("Spectrum brightness", light);
-    menu.addSubMenu ("EQ scale", scale);
-    menu.addSeparator();
-    menu.addSectionHeader ("Renderer");
-    menu.addItem (1, "GPU (OpenGL)", true, gpu);
-    menu.addItem (2, "CPU (software)", true, ! gpu);
-
-    juce::Component::SafePointer<MeridianEditor> safe (this);
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&header), [safe] (int r)
-    {
-        if (safe == nullptr || r == 0) return;
-        auto& state = safe->proc.apvts.state;
-        const double lv[] = { 0.5, 0.75, 1.0, 1.5 };
-        const int rg[] = { 6, 12, 18, 30 };
-        if (r == 1 || r == 2) state.setProperty (kGpu, r == 1, nullptr);
-        else if (r >= 400) state.setProperty (kRange, rg[r - 400], nullptr);
-        else if (r >= 300) state.setProperty (kBright, lv[r - 300], nullptr);
-        else if (r >= 200) state.setProperty (kFftOrder, r - 200, nullptr);
-        else if (r >= 100) state.setProperty (kRefresh, r - 100, nullptr);
-        safe->applySettings();
-    });
 }
 
 void MeridianEditor::selectBand (int band)
@@ -121,12 +104,47 @@ void MeridianEditor::selectBand (int band)
     dynamicsPanel.setBand (band);
 }
 
+void MeridianEditor::undo()
+{
+    proc.undoManager.undo();
+}
+
+void MeridianEditor::redo()
+{
+    proc.undoManager.redo();
+}
+
+bool MeridianEditor::keyPressed (const juce::KeyPress& key)
+{
+    const auto mods = key.getModifiers();
+    if (mods.isCommandDown() && key.getKeyCode() == 'Z')
+    {
+        mods.isShiftDown() ? redo() : undo();
+        return true;
+    }
+    if (mods.isCommandDown() && key.getKeyCode() == 'Y') { redo(); return true; }
+    if (key == juce::KeyPress::escapeKey)
+    {
+        if (settingsPanel.isOpen()) settingsPanel.close(); else selectBand (-1);
+        return true;
+    }
+    return false;
+}
+
+void MeridianEditor::mouseDown (const juce::MouseEvent&)
+{
+    // reached for clicks anywhere (we listen to all children): group what follows into one undo step
+    proc.undoManager.beginNewTransaction();
+}
+
 void MeridianEditor::timerCallback()
 {
+    proc.presets.tick();
     if (selected >= 0 && proc.bandValue (selected, params::band::on) < 0.5f)
         selectBand (-1);
     display.refresh();
     strip.repaint();
+    header.update();
     bandPanel.update();
     dynamicsPanel.update();
     globalPanel.update();
@@ -139,7 +157,24 @@ void MeridianEditor::paint (juce::Graphics& g)
 
 void MeridianEditor::resized()
 {
-    auto r = getLocalBounds();
+    const float sc = appliedScale > 0.0f ? appliedScale : 1.0f;
+    const int lw = juce::roundToInt ((float) getWidth() / sc);
+    const int lh = juce::roundToInt ((float) getHeight() / sc);
+    root.setTransform (juce::AffineTransform::scale (sc));
+    root.setBounds (0, 0, lw, lh);
+
+    if (! resizingFromScale && appliedScale > 0.0f && (lw != settings->logicalWidth || lh != settings->logicalHeight))
+    {
+        settings->logicalWidth = lw;
+        settings->logicalHeight = lh;
+    }
+}
+
+void MeridianEditor::layoutRoot()
+{
+    auto r = root.getLocalBounds();
+    settingsPanel.setBounds (r);
+
     header.setBounds (r.removeFromTop (52));
     const int bottomH = juce::jlimit (280, 330, (int) (r.getHeight() * 0.38));
     auto bottom = r.removeFromBottom (bottomH);
@@ -153,7 +188,4 @@ void MeridianEditor::resized()
     dynamicsPanel.setBounds (bottom.removeFromLeft ((int) (w * 0.40)));
     bottom.removeFromLeft (12);
     globalPanel.setBounds (bottom);
-
-    proc.apvts.state.setProperty (kWidth, getWidth(), nullptr);
-    proc.apvts.state.setProperty (kHeight, getHeight(), nullptr);
 }

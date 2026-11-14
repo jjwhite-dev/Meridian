@@ -1,5 +1,6 @@
 #include "EqDisplay.h"
 #include "Controls.h"
+#include "FilterIcons.h"
 #include "Theme.h"
 #include "../PluginProcessor.h"
 
@@ -346,7 +347,7 @@ void EqDisplay::paint (juce::Graphics& g)
         g.drawHorizontalLine (juce::roundToInt (yForDb (d)), 0.0f, w);
         g.drawHorizontalLine (juce::roundToInt (yForDb (-d)), 0.0f, w);
     }
-    g.setColour (juce::Colour (0xff2e333d));
+    g.setColour (theme::zeroLine);
     g.drawHorizontalLine (juce::roundToInt (yForDb (0)), 0.0f, w);
 
     // analyzer: smooth curves only
@@ -354,7 +355,7 @@ void EqDisplay::paint (juce::Graphics& g)
     const auto spectrumStroke = juce::PathStrokeType (1.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
     if (pre.active)
     {
-        g.setColour (juce::Colour (0xff2c3039).withMultipliedAlpha (bright));
+        g.setColour (theme::preLine.withMultipliedAlpha (bright));
         g.strokePath (spectrumPath (pre, false), spectrumStroke);
     }
     if (side.active && proc.sidechainConnected())
@@ -364,9 +365,14 @@ void EqDisplay::paint (juce::Graphics& g)
     }
     if (post.active)
     {
-        g.setColour (theme::muted.withAlpha (0.10f * bright));
+        // gradient from the low-frequency colour to the high-frequency colour
+        juce::ColourGradient fillGrad (theme::specLow.withAlpha (juce::jmin (1.0f, theme::specFill * bright)), 0.0f, 0.0f,
+                                       theme::specHigh.withAlpha (juce::jmin (1.0f, theme::specFill * bright)), w, 0.0f, false);
+        g.setGradientFill (fillGrad);
         g.fillPath (spectrumPath (post, true));
-        g.setColour (juce::Colour (0xff555b67).withMultipliedAlpha (bright));
+        juce::ColourGradient lineGrad (theme::specLow.withMultipliedAlpha (juce::jmin (1.0f, 0.9f * bright)), 0.0f, 0.0f,
+                                       theme::specHigh.withMultipliedAlpha (juce::jmin (1.0f, 0.9f * bright)), w, 0.0f, false);
+        g.setGradientFill (lineGrad);
         g.strokePath (spectrumPath (post, false), spectrumStroke);
     }
 
@@ -448,7 +454,7 @@ void EqDisplay::paint (juce::Graphics& g)
             }
         }
         const float xl = juce::jmax (0.0f, xForFreq (lo)), xh = juce::jmin (w, xForFreq (hi));
-        g.setColour (juce::Colour (0xa807080a));
+        g.setColour (theme::dim);
         g.fillRect (0.0f, 0.0f, xl, h);
         g.fillRect (xh, 0.0f, w - xh, h);
         const auto col = theme::channelColour ((int) p.channel);
@@ -461,7 +467,7 @@ void EqDisplay::paint (juce::Graphics& g)
         g.setFont (theme::mono (11.0f));
         const int tw = juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), text) + 40;
         auto banner = juce::Rectangle<int> (tw, 26).withCentre ({ getWidth() / 2, 25 });
-        g.setColour (juce::Colour (0xff16222a));
+        g.setColour (theme::banner);
         g.fillRoundedRectangle (banner.toFloat(), 13.0f);
         g.setColour (col.withAlpha (0.5f));
         g.drawRoundedRectangle (banner.toFloat(), 13.0f, 1.0f);
@@ -534,11 +540,11 @@ void EqDisplay::paint (juce::Graphics& g)
             g.setColour (theme::amber.withMultipliedAlpha (alpha));
             g.drawEllipse (r.expanded (3.0f), 1.2f);
         }
-        g.setColour ((isSel ? col : juce::Colour (0xff16191f)).withMultipliedAlpha (alpha));
+        g.setColour ((isSel ? col : theme::nodeFill).withMultipliedAlpha (alpha));
         g.fillEllipse (r);
         g.setColour (col.withMultipliedAlpha (b == hoverNode || isSel ? alpha : 0.75f * alpha));
         g.drawEllipse (r.reduced (0.75f), 1.6f);
-        g.setColour ((isSel ? theme::onAccent : theme::text).withMultipliedAlpha (alpha));
+        g.setColour ((isSel ? theme::on (col) : theme::text).withMultipliedAlpha (alpha));
         g.setFont (theme::font (11.0f, true));
         g.drawText (juce::String (b + 1), r, juce::Justification::centred);
 
@@ -551,7 +557,7 @@ void EqDisplay::paint (juce::Graphics& g)
             g.fillRoundedRectangle (br, 6.0f);
             g.setColour (active ? col : theme::border2);
             g.drawRoundedRectangle (br, 6.0f, 1.0f);
-            g.setColour (active ? theme::onAccent : theme::textDim);
+            g.setColour (active ? theme::on (col) : theme::textDim);
             g.strokePath (speaker, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded),
                           speaker.getTransformToScaleToFit (br.reduced (6.0f, 4.0f), true));
         }
@@ -572,7 +578,7 @@ void EqDisplay::paint (juce::Graphics& g)
         r.setX (juce::jlimit (6.0f, w - tw - 50.0f, r.getX()));
         g.setColour (theme::text);
         g.fillRoundedRectangle (r, 7.0f);
-        g.setColour (theme::onAccent);
+        g.setColour (theme::on (theme::text));
         g.drawText (text, r, juce::Justification::centred);
     }
 
@@ -739,7 +745,7 @@ void EqDisplay::mouseDown (const juce::MouseEvent& e)
         int i = 0;
         while (i < 4 && ranges[i] <= dbRange) ++i;
         dbRange = ranges[i % 4];
-        proc.apvts.state.setProperty ("uiRange", dbRange, nullptr);
+        if (onDbRangeChange) onDbRangeChange (dbRange);
         resized();
         repaint();
         return;
@@ -767,7 +773,11 @@ void EqDisplay::mouseDown (const juce::MouseEvent& e)
             if (onSelect) onSelect (b);
             beginDrag (b);
         }
+        return;
     }
+
+    // empty space: deselect
+    if (onSelect) onSelect (-1);
 }
 
 void EqDisplay::mouseDrag (const juce::MouseEvent& e)
@@ -831,7 +841,13 @@ void EqDisplay::showBandMenu (int band)
     const int curType = juce::roundToInt (proc.bandValue (band, pb::type));
     const int curCh = juce::roundToInt (proc.bandValue (band, pb::channel));
     for (int t = 0; t < (int) meq::FilterType::Count; ++t)
-        types.addItem (100 + t, meq::filterTypeName ((meq::FilterType) t), true, t == curType);
+    {
+        juce::PopupMenu::Item item (meq::filterTypeName ((meq::FilterType) t));
+        item.itemID = 100 + t;
+        item.isTicked = t == curType;
+        item.image = filtericons::drawable ((meq::FilterType) t, theme::channelColour (curCh));
+        types.addItem (std::move (item));
+    }
     const char* chNames[] = { "Stereo", "Left", "Right", "Mid", "Side" };
     for (int c = 0; c < 5; ++c)
     {

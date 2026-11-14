@@ -91,4 +91,9 @@ namespace icons
     juce::Path power();
     juce::Path gear();
     juce::Path speaker();
+    juce::Path chevronLeft();
+    juce::Path chevronRight();
+    juce::Path save();
+    juce::Path undo();
+    juce::Path redo();
 }

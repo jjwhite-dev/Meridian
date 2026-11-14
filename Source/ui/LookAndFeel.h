@@ -11,6 +11,8 @@ class MeridianLookAndFeel : public juce::LookAndFeel_V4
 {
 public:
     MeridianLookAndFeel();
+    /** Re-reads the theme colours (after the palette changed). */
+    void applyTheme();
 
     void drawRotarySlider (juce::Graphics&, int x, int y, int w, int h, float pos,
                            float startAngle, float endAngle, juce::Slider&) override;

@@ -24,6 +24,8 @@ public:
     void setSelected (int band);
     int getSelected() const { return selected; }
     std::function<void (int)> onSelect;
+    /** Called when the user cycles the dB scale by clicking it. */
+    std::function<void (float)> onDbRangeChange;
 
     void setAnalyzerOrder (int order);
     void setBrightness (float b)        { brightness = b; repaint(); }

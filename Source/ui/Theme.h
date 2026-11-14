@@ -2,38 +2,42 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+/** The interface colours. A Palette holds the colours a user can edit; apply()
+    derives the rest (borders, grid, ...) and sets the globals below, which the
+    whole interface paints with. The palette is a user preference shared by all
+    instances (see GlobalSettings). */
 namespace theme
 {
-    inline const juce::Colour bg      { 0xff0b0c0f };
-    inline const juce::Colour panel   { 0xff121418 };
-    inline const juce::Colour display { 0xff0e1014 };
-    inline const juce::Colour well    { 0xff1a1d23 };
-    inline const juce::Colour line    { 0xff1c1f26 };
-    inline const juce::Colour border  { 0xff262a32 };
-    inline const juce::Colour border2 { 0xff2e333d };
-    inline const juce::Colour gridMinor { 0xff171a20 };
-    inline const juce::Colour gridMajor { 0xff20242c };
-    inline const juce::Colour text    { 0xffe7e9ee };
-    inline const juce::Colour textDim { 0xffc9cdd5 };
-    inline const juce::Colour muted   { 0xff8d93a0 };
-    inline const juce::Colour faint   { 0xff4a505c };
-    inline const juce::Colour accent  { 0xff6ccbf5 };
-    inline const juce::Colour amber   { 0xfff0a35e };
-    inline const juce::Colour onAccent { 0xff0b0c0f };
-
-    /** One colour per processing channel: Stereo, Left, Right, Mid, Side.
-        They differ in lightness as well as hue so they stay apart for colour-blind users. */
-    inline juce::Colour channelColour (int channel)
+    struct Palette
     {
-        switch (channel)
-        {
-            case 1:  return juce::Colour (0xff5b8cff); // Left: blue
-            case 2:  return juce::Colour (0xffff8fb1); // Right: pink
-            case 3:  return juce::Colour (0xff8fe3a6); // Mid: green
-            case 4:  return juce::Colour (0xffc39bff); // Side: violet
-            default: return accent;                    // Stereo: cyan
-        }
-    }
+        juce::String name;
+        juce::Colour bg, panel, display, text, muted, accent, amber;
+        juce::Colour stereo, left, right, mid, side;
+        juce::Colour specLow, specHigh;   // analyzer gradient, low to high frequencies
+        float specFill = 0.14f;           // analyzer fill opacity
+    };
+
+    /** Editable colour slots, in the order the options panel lists them. */
+    struct Slot { const char* key; const char* label; juce::Colour Palette::* member; };
+    const std::vector<Slot>& slots();
+
+    /** The ten built-in palettes. */
+    const std::vector<Palette>& presets();
+
+    void apply (const Palette&);
+
+    // ---- derived, current colours (set by apply)
+    inline juce::Colour bg, panel, display, well, line, border, border2, gridMinor, gridMajor;
+    inline juce::Colour text, textDim, muted, faint, accent, amber, onAccent;
+    inline juce::Colour specLow, specHigh, preLine, zeroLine, banner, dim, nodeFill;
+    inline float specFill = 0.14f;
+    inline std::array<juce::Colour, 5> channels;
+
+    /** One colour per processing channel: Stereo, Left, Right, Mid, Side. */
+    inline juce::Colour channelColour (int channel) { return channels[(size_t) juce::jlimit (0, 4, channel)]; }
+
+    /** Text colour that reads on top of a filled colour. */
+    inline juce::Colour on (juce::Colour fill) { return fill.getPerceivedBrightness() > 0.55f ? juce::Colour (0xff0b0c0f) : juce::Colours::white; }
 
     inline juce::Font font (float height, bool bold = false)
     {

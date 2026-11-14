@@ -163,7 +163,8 @@ void SegmentedControl::paint (juce::Graphics& g)
             g.setColour (theme::well);
             g.fillRoundedRectangle (s, 6.0f);
         }
-        g.setColour (! en ? theme::faint : (i == selected ? theme::onAccent : theme::textDim));
+        const auto fillCol = juce::isPositiveAndBelow (i, optionColours.size()) ? optionColours[i] : on;
+        g.setColour (! en ? theme::faint : (i == selected ? theme::on (fillCol) : theme::textDim));
         g.drawText (options[i], s, juce::Justification::centred);
     }
 }
@@ -199,7 +200,7 @@ void IconButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
     g.setColour (on ? theme::accent : (highlighted ? theme::border2 : theme::border));
     g.drawRoundedRectangle (r, 7.0f, 1.0f);
     const auto area = r.reduced (r.getWidth() * 0.28f);
-    g.setColour (on ? theme::onAccent : theme::textDim);
+    g.setColour (on ? theme::on (theme::accent) : theme::textDim);
     g.strokePath (icon, juce::PathStrokeType (1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded),
                   icon.getTransformToScaleToFit (area, true));
 }
@@ -230,6 +231,40 @@ namespace icons
             p.startNewSubPath (6 + 4.0f * std::cos (a), 6 + 4.0f * std::sin (a));
             p.lineTo (6 + 6.0f * std::cos (a), 6 + 6.0f * std::sin (a));
         }
+        return p;
+    }
+    juce::Path chevronLeft()
+    {
+        juce::Path p;
+        p.startNewSubPath (6, 0); p.lineTo (1, 5); p.lineTo (6, 10);
+        return p;
+    }
+    juce::Path chevronRight()
+    {
+        juce::Path p;
+        p.startNewSubPath (1, 0); p.lineTo (6, 5); p.lineTo (1, 10);
+        return p;
+    }
+    juce::Path save()
+    {
+        juce::Path p;
+        p.startNewSubPath (0, 0); p.lineTo (8.5f, 0); p.lineTo (11, 2.5f); p.lineTo (11, 11); p.lineTo (0, 11); p.closeSubPath();
+        p.startNewSubPath (3, 0); p.lineTo (3, 3.5f); p.lineTo (8, 3.5f); p.lineTo (8, 0);
+        p.addRectangle (2.5f, 6.5f, 6.0f, 4.5f);
+        return p;
+    }
+    juce::Path undo()
+    {
+        juce::Path p;
+        p.startNewSubPath (3, 1); p.lineTo (0.5f, 3.5f); p.lineTo (3, 6);
+        p.startNewSubPath (0.5f, 3.5f); p.lineTo (7, 3.5f);
+        p.cubicTo (10.5f, 3.5f, 10.5f, 10, 7, 10); p.lineTo (4, 10);
+        return p;
+    }
+    juce::Path redo()
+    {
+        juce::Path p = undo();
+        p.applyTransform (juce::AffineTransform::scale (-1.0f, 1.0f).translated (11.0f, 0.0f));
         return p;
     }
     juce::Path speaker()
