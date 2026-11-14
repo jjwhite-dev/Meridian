@@ -29,6 +29,11 @@ public:
 
     void setAnalyzerOrder (int order);
     void setBrightness (float b)        { brightness = b; repaint(); }
+
+    /** 0 = smooth curve, 1 = particles (columns of glowing dots with falling peak dots). */
+    void setSpectrumStyle (int style)   { spectrumStyle = style; repaint(); }
+    void setParticleLook (float dotSize, int spacing);
+    void setFrameRate (int hz)          { frameRate = juce::jmax (15, hz); }
     void setDbRange (float r)           { dbRange = r; repaint(); }
     float getDbRange() const            { return dbRange; }
 
@@ -69,6 +74,9 @@ private:
     void rebuildCurves();
     juce::Path spectrumPath (const Spectrum&, bool closed) const;
     juce::Path curvePath (const std::vector<float>& db) const;
+    void updateParticles();
+    void buildSprites();
+    void drawParticles (juce::Graphics&);
 
     int nodeAt (juce::Point<float>) const;
     int auditionButtonAt (juce::Point<float>) const;
@@ -92,6 +100,17 @@ private:
     std::array<double, kGridPoints> gridFreqs {};
     Spectrum pre, post, side;
     float brightness = 1.0f;
+
+    // particle style
+    int spectrumStyle = 0, frameRate = 60;
+    float dotSize = 2.4f;
+    int dotSpacing = 6;
+    unsigned frameCount = 0;
+    std::vector<float> colTop, colPeak;      // per column: y of the top dot row, y of the falling peak dot
+    std::vector<int> colRows;                // per column: number of dot rows
+    juce::Image bodySprite, upperSprite, sparkSprite, peakSprite;
+    juce::String spriteKey;
+    static constexpr float spritePixelScale = 2.0f;
     double specRate = 48000.0;
 
     // curves

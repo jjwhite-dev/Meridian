@@ -16,6 +16,9 @@ public:
     int refreshHz = 60;
     int fftOrder = 13;        // High
     float brightness = 1.0f;
+    int spectrumStyle = 0;    // 0 smooth, 1 particles
+    float particleDot = 2.4f;
+    int particleSpacing = 6;
     float dbRange = 18.0f;
     bool gpu = true;
     float uiScale = 1.0f;

@@ -21,7 +21,7 @@ namespace theme
     struct Slot { const char* key; const char* label; juce::Colour Palette::* member; };
     const std::vector<Slot>& slots();
 
-    /** The ten built-in palettes. */
+    /** The built-in palettes. */
     const std::vector<Palette>& presets();
 
     void apply (const Palette&);

@@ -161,6 +161,16 @@ public:
         scale.onChange = [this] (int i) { const float r[] = { 6, 12, 18, 30 }; settings.dbRange = r[i]; settings.changed(); };
         size.onChange = [this] (int i) { settings.uiScale = GlobalSettings::uiScales()[(size_t) i]; settings.changed(); };
         renderer.onChange = [this] (int i) { settings.gpu = i == 0; settings.changed(); };
+        style.onChange = [this] (int i) { settings.spectrumStyle = i; settings.changed(); resized(); };
+
+        dot.slider.setRange (1.4, 4.0, 0.1);
+        dot.slider.textFromValueFunction = [] (double v) { return juce::String (v, 1) + " px"; };
+        dot.slider.onDragEnd = [this] { settings.save(); };
+        dot.slider.onValueChange = [this] { dot.repaint(); settings.particleDot = (float) dot.slider.getValue(); settings.sendChangeMessage(); };
+        spacing.slider.setRange (4.0, 10.0, 1.0);
+        spacing.slider.textFromValueFunction = [] (double v) { return juce::String (juce::roundToInt (v)) + " px"; };
+        spacing.slider.onDragEnd = [this] { settings.save(); };
+        spacing.slider.onValueChange = [this] { spacing.repaint(); settings.particleSpacing = juce::roundToInt (spacing.slider.getValue()); settings.sendChangeMessage(); };
 
         brightness.slider.setRange (50.0, 150.0, 1.0);
         brightness.slider.textFromValueFunction = [] (double v) { return juce::String (juce::roundToInt (v)) + "%"; };
@@ -194,7 +204,8 @@ public:
 
         for (juce::Component* c : { (juce::Component*) &refresh, (juce::Component*) &resolution, (juce::Component*) &brightness,
                                     (juce::Component*) &scale, (juce::Component*) &size, (juce::Component*) &renderer,
-                                    (juce::Component*) &fill, (juce::Component*) &reset })
+                                    (juce::Component*) &fill, (juce::Component*) &reset, (juce::Component*) &style,
+                                    (juce::Component*) &dot, (juce::Component*) &spacing })
             addAndMakeVisible (c);
 
         for (int i = 0; i < (int) theme::presets().size(); ++i)
@@ -217,6 +228,11 @@ public:
         const auto& sc = GlobalSettings::uiScales();
         for (int i = 0; i < (int) sc.size(); ++i) if (std::abs (settings.uiScale - sc[(size_t) i]) < 0.01f) size.setSelected (i);
         renderer.setSelected (settings.gpu ? 0 : 1);
+        style.setSelected (settings.spectrumStyle);
+        dot.slider.setValue (settings.particleDot, juce::dontSendNotification);
+        spacing.slider.setValue (settings.particleSpacing, juce::dontSendNotification);
+        dot.setEnabled (settings.spectrumStyle == 1);
+        spacing.setEnabled (settings.spectrumStyle == 1);
         brightness.slider.setValue (settings.brightness * 100.0, juce::dontSendNotification);
         fill.slider.setValue (settings.palette.specFill * 100.0, juce::dontSendNotification);
         if (settings.paletteIndex >= 0) lastPreset = settings.paletteIndex;
@@ -250,6 +266,10 @@ public:
         };
 
         heading ("Display");
+        row ("Spectrum style", style);
+        dot.setBounds (16, y, (w - 12) / 2, 34);
+        spacing.setBounds (16 + (w - 12) / 2 + 12, y, (w - 12) / 2, 34);
+        y += 48;
         row ("Spectrum refresh rate (fps)", refresh);
         row ("Spectrum resolution", resolution);
         brightness.setBounds (16, y, w, 34); y += 48;
@@ -286,6 +306,8 @@ public:
                                juce::String (juce::CharPointer_UTF8 ("\xc2\xb1" "18")), juce::String (juce::CharPointer_UTF8 ("\xc2\xb1" "30")) } };
     SegmentedControl size { { "80%", "100%", "125%", "150%", "175%", "200%" } };
     SegmentedControl renderer { { "GPU (OpenGL)", "CPU (software)" } };
+    SegmentedControl style { { "Smooth", "Particles" } };
+    BarSlider dot { "Dot size" }, spacing { "Dot spacing" };
     BarSlider fill { "Spectrum fill opacity" };
     juce::TextButton reset { "Reset colours to preset" };
     juce::OwnedArray<juce::Component> cards, rows;

@@ -1,4 +1,4 @@
-# Meridian EQ — prototype 0.2.0
+# Meridian EQ — prototype 0.2.1
 
 A 32-band parametric / dynamic EQ plugin (VST3 on Windows and macOS, AU on
 macOS) with a GPU-drawn interface. This is the first working prototype: the
@@ -72,14 +72,19 @@ below).
   (dynamics see the signal before it is processed), auto gain, M/S monitor,
   2× oversampling, phase mode.
 - **Options** (gear, top right): a panel slides in from the right with
-  - Display: spectrum refresh rate (default 60 fps), resolution (default
-    High), brightness, EQ scale.
+  - Display: spectrum style — **Smooth** (filled curve) or **Particles**
+    (columns of glowing dots in the spectrum's low colour, sparks in its high
+    colour that get denser towards the highs, and peak dots that hang and
+    fall; the EQ curve gets a soft glow), with dot size and dot spacing;
+    spectrum refresh rate (default 60 fps), resolution (default High),
+    brightness, EQ scale.
   - Interface: size 80 / 100 / 125 / 150 / 175 / 200 %, and the renderer:
     **GPU (OpenGL)** (default) or **CPU (software)**. The status line in the
     Global panel shows which one is drawing.
   - Colour presets: Graphite, Midnight, Nordic Frost, Obsidian Gold, Rose
-    Quartz, Forest, Neon Noir, Solar Ember, Sandstone and Arctic (the last two
-    are light themes).
+    Quartz, Forest, Neon Noir, Solar Ember, Nexus (black, magenta and orange,
+    made for the Particles style), Sandstone and Arctic (the last two are
+    light themes).
   - Custom colours: click any swatch (background, panels, display, text,
     accent, dynamics, each channel colour, and the two ends of the spectrum
     gradient) to pick a colour; spectrum fill opacity; reset to the preset.

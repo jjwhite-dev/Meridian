@@ -62,6 +62,9 @@ void MeridianEditor::applySettings()
 
     if (s.fftOrder != appliedFftOrder) { display.setAnalyzerOrder (s.fftOrder); appliedFftOrder = s.fftOrder; }
     display.setBrightness (s.brightness);
+    display.setSpectrumStyle (s.spectrumStyle);
+    display.setParticleLook (s.particleDot, s.particleSpacing);
+    display.setFrameRate (s.refreshHz);
     display.setDbRange (s.dbRange);
     if (s.refreshHz != appliedRefresh) { startTimerHz (juce::jlimit (15, 144, s.refreshHz)); appliedRefresh = s.refreshHz; }
     setGpuRendering (s.gpu);

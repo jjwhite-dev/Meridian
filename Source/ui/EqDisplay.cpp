@@ -172,6 +172,156 @@ void EqDisplay::analyse (Spectrum& s)
     }
 }
 
+void EqDisplay::setParticleLook (float size, int spacing)
+{
+    dotSize = juce::jlimit (1.0f, 6.0f, size);
+    dotSpacing = juce::jlimit (3, 14, spacing);
+    repaint();
+}
+
+void EqDisplay::buildSprites()
+{
+    const int step = dotSpacing;
+    const int h = juce::jmax (1, getHeight());
+    const float ps = spritePixelScale;
+    const juce::String key = juce::String (step) + "|" + juce::String (dotSize) + "|" + juce::String (h) + "|"
+                           + theme::specLow.toString() + theme::specHigh.toString();
+    if (key == spriteKey) return;
+    spriteKey = key;
+
+    const float r = dotSize * 0.5f;
+    const float halo = juce::jmin ((float) step * 0.5f, dotSize * 1.9f);
+    auto glowDot = [&] (juce::Graphics& g, float cx, float cy, juce::Colour c, float alpha, bool glow)
+    {
+        if (glow)
+        {
+            juce::ColourGradient grad (c.withAlpha (0.38f * alpha), cx, cy, c.withAlpha (0.0f), cx + halo, cy, true);
+            g.setGradientFill (grad);
+            g.fillEllipse (cx - halo, cy - halo, halo * 2, halo * 2);
+        }
+        g.setColour (c.withAlpha (alpha));
+        g.fillEllipse (cx - r, cy - r, r * 2, r * 2);
+    };
+
+    // a full-height column of dots on the row grid used by drawParticles (rows from the bottom up)
+    auto column = [&] (juce::Colour c, float alpha, bool glow)
+    {
+        juce::Image img (juce::Image::ARGB, juce::roundToInt (step * ps), juce::roundToInt (h * ps), true);
+        juce::Graphics g (img);
+        g.addTransform (juce::AffineTransform::scale (ps));
+        const float bottomY = (float) h - 4.0f;
+        for (float y = bottomY; y > -step; y -= (float) step)
+            glowDot (g, step * 0.5f, y, c, alpha, glow);
+        return img;
+    };
+    bodySprite = column (theme::specLow, 0.42f, false);
+    upperSprite = column (theme::specLow, 0.95f, true);
+
+    auto single = [&] (juce::Colour c, float alpha)
+    {
+        const int sz = juce::roundToInt (halo * 2 + 2);
+        juce::Image img (juce::Image::ARGB, juce::roundToInt (sz * ps), juce::roundToInt (sz * ps), true);
+        juce::Graphics g (img);
+        g.addTransform (juce::AffineTransform::scale (ps));
+        glowDot (g, sz * 0.5f, sz * 0.5f, c, alpha, true);
+        return img;
+    };
+    sparkSprite = single (theme::specHigh, 0.95f);
+    peakSprite = single (theme::specHigh, 1.0f);
+}
+
+void EqDisplay::updateParticles()
+{
+    const int step = dotSpacing;
+    const int cols = juce::jmax (1, getWidth() / step);
+    const float bottomY = (float) getHeight() - 4.0f;
+    if ((int) colTop.size() != cols)
+    {
+        colTop.assign ((size_t) cols, bottomY);
+        colPeak.assign ((size_t) cols, bottomY);
+        colRows.assign ((size_t) cols, 0);
+    }
+    // peaks fall about 100 px per second whatever the refresh rate
+    const float fall = 100.0f / (float) frameRate;
+    for (int i = 0; i < cols; ++i)
+    {
+        const float xc = (float) (i * step) + step * 0.5f;
+        const double f = freqForX (xc);
+        const float yTop = juce::jlimit (6.0f, bottomY + 1.0f, ySpec (gridDbAt (post, f), f));
+        const int rows = post.active ? juce::jmax (0, (int) std::floor ((bottomY - yTop) / (float) step) + 1) : 0;
+        const float topRowY = bottomY - (float) (juce::jmax (1, rows) - 1) * step;
+        colRows[(size_t) i] = rows;
+        colTop[(size_t) i] = topRowY;
+        colPeak[(size_t) i] = juce::jmin (rows > 0 ? topRowY : bottomY, colPeak[(size_t) i] + fall);
+    }
+    ++frameCount;
+}
+
+void EqDisplay::drawParticles (juce::Graphics& g)
+{
+    buildSprites();
+    const int step = dotSpacing;
+    const int h = getHeight();
+    const float ps = spritePixelScale;
+    const int bottomY = h - 4;
+    const float w = (float) getWidth();
+
+    auto hash = [] (int a, int b, unsigned c)
+    {
+        unsigned x = (unsigned) a * 73856093u ^ (unsigned) b * 19349663u ^ c * 83492791u;
+        x ^= x >> 13; x *= 0x5bd1e995u; x ^= x >> 15;
+        return (float) (x & 0xffffu) / 65535.0f;
+    };
+
+    g.setOpacity (juce::jlimit (0.0f, 1.0f, brightness));
+    for (int i = 0; i < (int) colTop.size(); ++i)
+    {
+        const int rows = colRows[(size_t) i];
+        const int x0 = i * step;
+        if (rows > 0)
+        {
+            // dim body, brighter glowing top part (top 38 % of the column)
+            const int upperRows = juce::jmax (1, juce::roundToInt (rows * 0.38f));
+            const int bodyRows = rows - upperRows;
+            const int yBodyTop = bottomY - (bodyRows - 1) * step - step / 2;
+            const int yUpperTop = bottomY - (rows - 1) * step - step / 2;
+            if (bodyRows > 0)
+                g.drawImage (bodySprite, x0, yBodyTop, step, h - yBodyTop,
+                             0, juce::roundToInt (yBodyTop * ps), bodySprite.getWidth(), juce::roundToInt ((h - yBodyTop) * ps));
+            const int yUpperBottom = bodyRows > 0 ? yBodyTop : h;
+            g.drawImage (upperSprite, x0, yUpperTop, step, yUpperBottom - yUpperTop,
+                         0, juce::roundToInt (yUpperTop * ps), upperSprite.getWidth(), juce::roundToInt ((yUpperBottom - yUpperTop) * ps));
+
+            // sparks in the second colour, more of them towards the highs and the top of each column
+            const float xr = (float) x0 / w;
+            const float cx = (float) x0 + step * 0.5f;
+            const int sw = sparkSprite.getWidth(), sh = sparkSprite.getHeight();
+            const float half = (float) sw / ps * 0.5f;
+            for (int k = 0; k < rows; ++k)
+            {
+                const float hr = rows > 1 ? (float) k / (float) (rows - 1) : 1.0f;
+                const float prob = (0.04f + 0.32f * xr) * (0.3f + hr);
+                if (hash (i, k, frameCount / (hr > 0.6f ? 1u : 3u)) < prob)
+                {
+                    const float cy = (float) (bottomY - k * step);
+                    g.drawImage (sparkSprite, juce::roundToInt (cx - half), juce::roundToInt (cy - half),
+                                 juce::roundToInt (half * 2), juce::roundToInt (half * 2), 0, 0, sw, sh);
+                }
+            }
+        }
+        // falling peak dot
+        const float pk = colPeak[(size_t) i];
+        if (pk < colTop[(size_t) i] - step || (rows == 0 && pk < bottomY - step))
+        {
+            const int sw = peakSprite.getWidth(), sh = peakSprite.getHeight();
+            const float half = (float) sw / ps * 0.5f;
+            g.drawImage (peakSprite, juce::roundToInt ((float) x0 + step * 0.5f - half), juce::roundToInt (pk - half),
+                         juce::roundToInt (half * 2), juce::roundToInt (half * 2), 0, 0, sw, sh);
+        }
+    }
+    g.setOpacity (1.0f);
+}
+
 void EqDisplay::refresh()
 {
     specRate = proc.baseSampleRate();
@@ -181,6 +331,7 @@ void EqDisplay::refresh()
     analyse (pre);
     analyse (post);
     if (side.active) analyse (side);
+    if (spectrumStyle == 1) updateParticles();
     rebuildCurves();
     repaint();
 }
@@ -363,7 +514,11 @@ void EqDisplay::paint (juce::Graphics& g)
         g.setColour (theme::amber.withAlpha (0.35f * bright));
         g.strokePath (spectrumPath (side, false), spectrumStroke);
     }
-    if (post.active)
+    if (spectrumStyle == 1)
+    {
+        drawParticles (g);
+    }
+    else if (post.active)
     {
         // gradient from the low-frequency colour to the high-frequency colour
         juce::ColourGradient fillGrad (theme::specLow.withAlpha (juce::jmin (1.0f, theme::specFill * bright)), 0.0f, 0.0f,
@@ -421,8 +576,17 @@ void EqDisplay::paint (juce::Graphics& g)
         const bool draw = k == 0 ? (channelUsed[0] || ! anyBand) : channelUsed[(size_t) k];
         if (! draw) continue;
         const auto col = k == 0 ? theme::text : theme::channelColour (k);
+        const auto cp = curvePath (channelDb[(size_t) k]);
+        if (spectrumStyle == 1)
+        {
+            // soft glow under the curve
+            g.setColour (theme::specLow.withAlpha (0.12f));
+            g.strokePath (cp, juce::PathStrokeType (9.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            g.setColour (theme::specLow.withAlpha (0.22f));
+            g.strokePath (cp, juce::PathStrokeType (4.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
         g.setColour (col);
-        g.strokePath (curvePath (channelDb[(size_t) k]), curveStroke);
+        g.strokePath (cp, curveStroke);
         if (channelDynamic[(size_t) k])
         {
             juce::Path dashed;

@@ -12,6 +12,9 @@ GlobalSettings::GlobalSettings()
     refreshHz     = juce::jlimit (15, 144, file->getIntValue ("refreshHz", 60));
     fftOrder      = juce::jlimit (11, 14, file->getIntValue ("fftOrder", 13));
     brightness    = (float) file->getDoubleValue ("brightness", 1.0);
+    spectrumStyle = juce::jlimit (0, 1, file->getIntValue ("spectrumStyle", 0));
+    particleDot   = juce::jlimit (1.0f, 6.0f, (float) file->getDoubleValue ("particleDot", 2.4));
+    particleSpacing = juce::jlimit (3, 14, file->getIntValue ("particleSpacing", 6));
     dbRange       = (float) file->getDoubleValue ("dbRange", 18.0);
     gpu           = file->getBoolValue ("gpu", true);
     uiScale       = juce::jlimit (0.5f, 3.0f, (float) file->getDoubleValue ("uiScale", 1.0));
@@ -45,6 +48,9 @@ void GlobalSettings::save()
     file->setValue ("refreshHz", refreshHz);
     file->setValue ("fftOrder", fftOrder);
     file->setValue ("brightness", brightness);
+    file->setValue ("spectrumStyle", spectrumStyle);
+    file->setValue ("particleDot", particleDot);
+    file->setValue ("particleSpacing", particleSpacing);
     file->setValue ("dbRange", dbRange);
     file->setValue ("gpu", gpu);
     file->setValue ("uiScale", uiScale);
