@@ -10,8 +10,9 @@ class AnalyzerFifo;
 
 /** The big curve + analyzer view. Bands are dots: drag to move (frequency /
     gain), wheel for Q, double-click to add or remove, right-click for a menu.
-    Holding a dot auditions the band. Clicking near a peak in the analyzer
-    grabs it into a new band (Spectrum Grab). */
+    The speaker button above a dot auditions that band. Clicking near a peak in
+    the analyzer grabs it into a new band (Spectrum Grab). Every band's own
+    curve is drawn in the colour of its processing channel. */
 class EqDisplay : public juce::Component
 {
 public:
@@ -28,7 +29,6 @@ public:
     void setBrightness (float b)        { brightness = b; repaint(); }
     void setDbRange (float r)           { dbRange = r; repaint(); }
     float getDbRange() const            { return dbRange; }
-    void setAuditionOnDrag (bool b)     { auditionOnDrag = b; }
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -40,10 +40,15 @@ public:
     void mouseDoubleClick (const juce::MouseEvent&) override;
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
 
+    /** Number of points of the smoothed, log-spaced spectrum. */
+    static constexpr int kGridPoints = 256;
+
 private:
     struct Spectrum
     {
-        std::vector<float> ring, db;
+        std::vector<float> ring;  // last N samples
+        std::vector<float> db;    // raw bins (for peak finding)
+        std::vector<float> grid;  // 1/6-octave smoothed, log-spaced, time-smoothed (for drawing)
         int write = 0;
         bool active = false;
         int silentFrames = 0;
@@ -55,7 +60,7 @@ private:
     float yForDb (double db) const;
     double dbForY (float y) const;
     float ySpec (double db, double f) const;
-    double specDbAt (const Spectrum&, double f) const;
+    double gridDbAt (const Spectrum&, double f) const;
 
     void pull (AnalyzerFifo&, Spectrum&);
     void analyse (Spectrum&);
@@ -64,7 +69,11 @@ private:
     juce::Path curvePath (const std::vector<float>& db) const;
 
     int nodeAt (juce::Point<float>) const;
+    int auditionButtonAt (juce::Point<float>) const;
     juce::Point<float> nodePosition (int band) const;
+    juce::Rectangle<float> auditionButtonBounds (int band) const;
+    bool showsAuditionButton (int band) const;
+    void toggleAudition (int band);
     bool findPeakNear (juce::Point<float> p, double& freq, double& db) const;
     void beginDrag (int band);
     void endDrag();
@@ -77,7 +86,8 @@ private:
     int fftOrder = 12;
     std::unique_ptr<juce::dsp::FFT> fft;
     std::unique_ptr<juce::dsp::WindowingFunction<float>> window;
-    std::vector<float> fftData, scratch;
+    std::vector<float> fftData, scratch, power;
+    std::array<double, kGridPoints> gridFreqs {};
     Spectrum pre, post, side;
     float brightness = 1.0f;
     double specRate = 48000.0;
@@ -87,14 +97,16 @@ private:
     double gainScale = 1.0;
     std::array<meq::BandParams, meq::kNumBands> bands {};
     std::array<meq::Cascade, meq::kNumBands> cascades {};
+    std::array<std::vector<float>, meq::kNumBands> bandDb;     // each band on its own
+    std::array<std::vector<float>, 5> channelDb, channelLiveDb; // per processing channel (stereo bands included)
+    std::array<bool, 5> channelUsed {}, channelDynamic {};
     std::vector<double> pointFreqs;
-    std::vector<float> totalDb, liveDb, selDb, selRangeDb;
-    bool anyDynamic = false;
+    std::vector<float> selRangeDb;
 
     // view / interaction
     float dbRange = 18.0f;
-    int selected = -1, hoverNode = -1, dragBand = -1;
-    bool hovering = false, auditionOnDrag = true, auditionFromDrag = false;
+    int selected = -1, hoverNode = -1, hoverAudition = -1, dragBand = -1;
+    bool hovering = false;
     juce::Point<float> hoverPos;
     bool grabCandidate = false;
     double grabFreq = 0, grabDb = 0;

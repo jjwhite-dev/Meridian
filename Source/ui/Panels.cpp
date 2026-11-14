@@ -103,9 +103,10 @@ void BandStrip::paint (juce::Graphics& g)
     {
         const auto d = proc.readBand (c.band);
         const bool on = c.band == selected;
-        g.setColour (on ? theme::accent : theme::panel);
+        const auto col = theme::channelColour ((int) d.channel);
+        g.setColour (on ? col : theme::panel);
         g.fillRoundedRectangle (c.r, 7.0f);
-        g.setColour (on ? theme::accent : theme::border);
+        g.setColour (on ? col : col.withAlpha (0.55f));
         g.drawRoundedRectangle (c.r, 7.0f, 1.0f);
         juce::String label = juce::String (c.band + 1) + " " + meq::filterTypeShort (d.type);
         if (d.channel != meq::Channel::Stereo) label << " " << params::channels[(int) d.channel];
@@ -130,7 +131,7 @@ void BandStrip::paint (juce::Graphics& g)
 
     g.setColour (theme::muted);
     g.setFont (theme::font (11.0f));
-    g.drawText ("Hold a dot to audition  /  drag to move  /  wheel for Q", getLocalBounds().withTrimmedRight (16),
+    g.drawText ("Speaker above a dot: audition  /  drag to move  /  wheel for Q", getLocalBounds().withTrimmedRight (16),
                 juce::Justification::centredRight);
 }
 
@@ -153,9 +154,11 @@ BandPanel::BandPanel (MeridianProcessor& p) : proc (p)
     addAndMakeVisible (type);
     for (auto* k : { &freq, &gain, &q, &slope }) addAndMakeVisible (*k);
     addAndMakeVisible (channel);
+    channel.setOptionColours ({ theme::channelColour (0), theme::channelColour (1), theme::channelColour (2),
+                                theme::channelColour (3), theme::channelColour (4) });
 
     solo.setClickingTogglesState (true);
-    solo.setTooltip ("Solo: hear only this band's range");
+    solo.setTooltip ("Audition: hear only this band's range (same as the speaker above the band's dot)");
     solo.onClick = [this]
     {
         if (band < 0) return;
@@ -385,7 +388,7 @@ void GlobalPanel::update()
     juce::String s = "Latency " + juce::String (lat) + " smp";
     if (proc.apvts.getRawParameterValue (params::autoGain)->load() > 0.5f)
         s << "  /  auto " << params::formatDb (proc.autoGainDb());
-    s << "  /  64-bit  /  OpenGL";
+    s << "  /  64-bit  /  " << (rendererName ? rendererName() : juce::String ("OpenGL"));
     if (s != status) { status = s; repaint(); }
 }
 

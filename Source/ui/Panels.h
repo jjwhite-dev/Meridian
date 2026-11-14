@@ -109,4 +109,8 @@ private:
     SegmentedControl monitor { { "Off", "Mid", "Side" } };
     std::unique_ptr<juce::ButtonParameterAttachment> autoAttachment;
     juce::String status;
+
+public:
+    /** Set by the editor: which renderer is drawing the interface right now. */
+    std::function<juce::String()> rendererName;
 };

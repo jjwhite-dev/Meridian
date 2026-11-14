@@ -1,4 +1,4 @@
-# Meridian EQ — prototype 0.1.0
+# Meridian EQ — prototype 0.1.1
 
 A 32-band parametric / dynamic EQ plugin (VST3 on Windows and macOS, AU on
 macOS) with a GPU-drawn interface. This is the first working prototype: the
@@ -28,12 +28,19 @@ below).
 - **Edit**: drag a dot (left/right = frequency, up/down = gain; hold Shift to
   change only the gain), mouse wheel over a dot for Q, double-click a dot to
   delete it, right-click for type, channel, dynamics, bypass and solo.
-- **Audition**: while you hold a dot, you hear only that band's range
-  (cut bands play what they remove). Everything outside the range is dimmed
-  and a banner shows what you hear. **S** in the band panel locks the solo on.
-  The analyzer always shows the processed signal, so moving a band shows up
-  in the spectrum straight away. Turn "Audition while dragging" off in the
-  settings menu (gear) if you prefer.
+- **Audition**: the speaker button above a dot (shown on the selected and the
+  hovered band) switches audition on and off. While it is on you hear only
+  that band's range (cut bands play what they remove), everything outside the
+  range is dimmed and a banner shows what you hear. **S** in the band panel
+  and the right-click menu do the same. The analyzer always shows the
+  processed signal, so moving a band shows up in the spectrum straight away.
+- **Colours**: every processing channel has its own colour — Stereo cyan,
+  Left blue, Right pink, Mid green, Side violet. Each band's own curve is
+  drawn in its channel's colour on top of the analyzer, together with the
+  combined curve: white for stereo, and one curve per channel (stereo bands
+  included) when L / R / M / S bands are in use.
+- **Analyzer**: 1/6-octave smoothed on a log frequency axis and drawn as
+  smooth curves (no corners), with fast rise and slower fall.
 - **Hover** anywhere for frequency, analyzer level and EQ gain at that point.
   Click the dB scale on the right to switch between ±6, ±12, ±18 and ±30 dB.
 - **Per band**: 15 filter types, slope 6–96 dB/oct for the cut filters,
@@ -53,7 +60,9 @@ below).
   (dynamics see the signal before it is processed), auto gain, M/S monitor,
   2× oversampling, phase mode.
 - **Settings** (gear): spectrum refresh rate, resolution, brightness, EQ
-  scale. Saved with the session, like the window size.
+  scale, and the renderer: **GPU (OpenGL)** (default) or **CPU (software)**.
+  The status line in the Global panel shows which one is drawing. Saved with
+  the session, like the window size.
 
 ### Sidechain in your DAW
 

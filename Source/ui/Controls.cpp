@@ -155,7 +155,7 @@ void SegmentedControl::paint (juce::Graphics& g)
         const bool en = isEnabled() && enabledFlags[i];
         if (i == selected && en)
         {
-            g.setColour (on);
+            g.setColour (juce::isPositiveAndBelow (i, optionColours.size()) ? optionColours[i] : on);
             g.fillRoundedRectangle (s, 6.0f);
         }
         else if (i == hover && en)

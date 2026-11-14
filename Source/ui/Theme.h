@@ -21,6 +21,20 @@ namespace theme
     inline const juce::Colour amber   { 0xfff0a35e };
     inline const juce::Colour onAccent { 0xff0b0c0f };
 
+    /** One colour per processing channel: Stereo, Left, Right, Mid, Side.
+        They differ in lightness as well as hue so they stay apart for colour-blind users. */
+    inline juce::Colour channelColour (int channel)
+    {
+        switch (channel)
+        {
+            case 1:  return juce::Colour (0xff5b8cff); // Left: blue
+            case 2:  return juce::Colour (0xffff8fb1); // Right: pink
+            case 3:  return juce::Colour (0xff8fe3a6); // Mid: green
+            case 4:  return juce::Colour (0xffc39bff); // Side: violet
+            default: return accent;                    // Stereo: cyan
+        }
+    }
+
     inline juce::Font font (float height, bool bold = false)
     {
         auto opts = juce::FontOptions (height);

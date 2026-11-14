@@ -52,6 +52,8 @@ public:
     void setSelected (int index, bool notify = false);
     int getSelected() const { return selected; }
     void setOptionEnabled (int index, bool enabled);
+    /** Optional per-option colour for the selected pill (otherwise accent / amber). */
+    void setOptionColours (juce::Array<juce::Colour> colours) { optionColours = std::move (colours); repaint(); }
 
     std::function<void (int)> onChange;
 
@@ -66,6 +68,7 @@ private:
 
     juce::StringArray options;
     juce::Array<bool> enabledFlags;
+    juce::Array<juce::Colour> optionColours;
     int selected = 0, hover = -1;
     bool amber;
     std::unique_ptr<juce::ParameterAttachment> attachment;

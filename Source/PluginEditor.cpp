@@ -6,7 +6,7 @@ namespace
     constexpr const char* kRefresh = "uiRefresh";   // Hz
     constexpr const char* kFftOrder = "uiFft";      // 11..14
     constexpr const char* kBright = "uiBright";     // 0.5..1.5
-    constexpr const char* kAudDrag = "uiAudDrag";   // bool
+    constexpr const char* kGpu = "uiGpu";           // bool: draw the editor with OpenGL
     constexpr const char* kRange = "uiRange";       // dB
     constexpr const char* kWidth = "uiW";
     constexpr const char* kHeight = "uiH";
@@ -17,10 +17,10 @@ MeridianEditor::MeridianEditor (MeridianProcessor& p)
 {
     setLookAndFeel (&lnf);
 
-    // GPU rendering: the whole editor is drawn through OpenGL
+    // GPU rendering: the whole editor is drawn through OpenGL (can be switched off in the settings menu)
     glContext.setComponentPaintingEnabled (true);
     glContext.setContinuousRepainting (false);
-    glContext.attachTo (*this);
+    globalPanel.rendererName = [this] { return glContext.isAttached() ? juce::String ("OpenGL") : juce::String ("CPU renderer"); };
 
     header.onSettings = [this] { showSettings(); };
     display.onSelect = [this] (int b) { selectBand (b); };
@@ -45,7 +45,7 @@ MeridianEditor::MeridianEditor (MeridianProcessor& p)
 MeridianEditor::~MeridianEditor()
 {
     stopTimer();
-    glContext.detach();
+    if (glContext.isAttached()) glContext.detach();
     setLookAndFeel (nullptr);
 }
 
@@ -54,9 +54,16 @@ void MeridianEditor::applySettings()
     const auto& st = proc.apvts.state;
     display.setAnalyzerOrder ((int) st.getProperty (kFftOrder, 12));
     display.setBrightness ((float) (double) st.getProperty (kBright, 1.0));
-    display.setAuditionOnDrag ((bool) st.getProperty (kAudDrag, true));
+    setGpuRendering ((bool) st.getProperty (kGpu, true));
     display.setDbRange ((float) (double) st.getProperty (kRange, 18.0));
     startTimerHz (juce::jlimit (15, 144, (int) st.getProperty (kRefresh, 60)));
+}
+
+void MeridianEditor::setGpuRendering (bool shouldUseGpu)
+{
+    if (shouldUseGpu && ! glContext.isAttached()) glContext.attachTo (*this);
+    else if (! shouldUseGpu && glContext.isAttached()) glContext.detach();
+    repaint();
 }
 
 void MeridianEditor::showSettings()
@@ -65,7 +72,7 @@ void MeridianEditor::showSettings()
     const int refresh = st.getProperty (kRefresh, 60);
     const int order = st.getProperty (kFftOrder, 12);
     const double bright = st.getProperty (kBright, 1.0);
-    const bool audDrag = st.getProperty (kAudDrag, true);
+    const bool gpu = st.getProperty (kGpu, true);
     const double range = st.getProperty (kRange, 18.0);
 
     juce::PopupMenu rate, res, light, scale, menu;
@@ -84,7 +91,9 @@ void MeridianEditor::showSettings()
     menu.addSubMenu ("Spectrum brightness", light);
     menu.addSubMenu ("EQ scale", scale);
     menu.addSeparator();
-    menu.addItem (1, "Audition while dragging a band", true, audDrag);
+    menu.addSectionHeader ("Renderer");
+    menu.addItem (1, "GPU (OpenGL)", true, gpu);
+    menu.addItem (2, "CPU (software)", true, ! gpu);
 
     juce::Component::SafePointer<MeridianEditor> safe (this);
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&header), [safe] (int r)
@@ -93,7 +102,7 @@ void MeridianEditor::showSettings()
         auto& state = safe->proc.apvts.state;
         const double lv[] = { 0.5, 0.75, 1.0, 1.5 };
         const int rg[] = { 6, 12, 18, 30 };
-        if (r == 1) state.setProperty (kAudDrag, ! (bool) state.getProperty (kAudDrag, true), nullptr);
+        if (r == 1 || r == 2) state.setProperty (kGpu, r == 1, nullptr);
         else if (r >= 400) state.setProperty (kRange, rg[r - 400], nullptr);
         else if (r >= 300) state.setProperty (kBright, lv[r - 300], nullptr);
         else if (r >= 200) state.setProperty (kFftOrder, r - 200, nullptr);

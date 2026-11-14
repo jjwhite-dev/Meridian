@@ -22,6 +22,7 @@ private:
     void selectBand (int band);
     void showSettings();
     void applySettings();
+    void setGpuRendering (bool shouldUseGpu);
 
     MeridianProcessor& proc;
     MeridianLookAndFeel lnf;
