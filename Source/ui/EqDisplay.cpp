@@ -179,23 +179,50 @@ void EqDisplay::setParticleLook (float size, int spacing)
     repaint();
 }
 
+float EqDisplay::layerScale() const
+{
+    return juce::jlimit (1.0f, 4.0f, juce::Component::getApproximateScaleFactorForComponent (const_cast<EqDisplay*> (this)));
+}
+
+float EqDisplay::heatAt (float y) const
+{
+    const float bottomY = (float) getHeight() - 4.0f;
+    return juce::jlimit (0.0f, 1.0f, (bottomY - y) / juce::jmax (1.0f, 0.8f * (float) getHeight()));
+}
+
+juce::Colour EqDisplay::heatColour (float t) const
+{
+    // heatmap from the bottom (cool, dim) to the top (hot, bright), built from the spectrum colours
+    const juce::Colour stops[] = { theme::specLow.interpolatedWith (theme::display, 0.6f), theme::specLow,
+                                   theme::specHigh, theme::specHigh.interpolatedWith (juce::Colours::white, 0.6f) };
+    const float pos[] = { 0.0f, 0.35f, 0.72f, 1.0f };
+    t = juce::jlimit (0.0f, 1.0f, t);
+    for (int i = 0; i < 3; ++i)
+        if (t <= pos[i + 1])
+            return stops[i].interpolatedWith (stops[i + 1], (t - pos[i]) / (pos[i + 1] - pos[i]));
+    return stops[3];
+}
+
 void EqDisplay::buildSprites()
 {
     const int step = dotSpacing;
     const int h = juce::jmax (1, getHeight());
-    const float ps = spritePixelScale;
+    const float ps = layerScale();
     const juce::String key = juce::String (step) + "|" + juce::String (dotSize) + "|" + juce::String (h) + "|"
-                           + theme::specLow.toString() + theme::specHigh.toString();
+                           + juce::String (ps) + "|" + juce::String (theme::version);
     if (key == spriteKey) return;
     spriteKey = key;
 
     const float r = dotSize * 0.5f;
     const float halo = juce::jmin ((float) step * 0.5f, dotSize * 1.9f);
-    auto glowDot = [&] (juce::Graphics& g, float cx, float cy, juce::Colour c, float alpha, bool glow)
+    auto heatDot = [&] (juce::Graphics& g, float cx, float cy, float t)
     {
-        if (glow)
+        const auto c = heatColour (t);
+        const float alpha = 0.35f + 0.65f * t;
+        if (t > 0.45f)
         {
-            juce::ColourGradient grad (c.withAlpha (0.38f * alpha), cx, cy, c.withAlpha (0.0f), cx + halo, cy, true);
+            const float ga = 0.4f * (t - 0.45f) / 0.55f;
+            juce::ColourGradient grad (c.withAlpha (ga), cx, cy, c.withAlpha (0.0f), cx + halo, cy, true);
             g.setGradientFill (grad);
             g.fillEllipse (cx - halo, cy - halo, halo * 2, halo * 2);
         }
@@ -203,31 +230,26 @@ void EqDisplay::buildSprites()
         g.fillEllipse (cx - r, cy - r, r * 2, r * 2);
     };
 
-    // a full-height column of dots on the row grid used by drawParticles (rows from the bottom up)
-    auto column = [&] (juce::Colour c, float alpha, bool glow)
+    // a full-height column of dots on the row grid used by drawParticles; each row's colour comes
+    // from its height, so one image (one texture) serves every column
+    heatColumn = juce::Image (juce::Image::ARGB, juce::jmax (1, juce::roundToInt (step * ps)), juce::roundToInt (h * ps), true);
     {
-        juce::Image img (juce::Image::ARGB, juce::roundToInt (step * ps), juce::roundToInt (h * ps), true);
-        juce::Graphics g (img);
+        juce::Graphics g (heatColumn);
         g.addTransform (juce::AffineTransform::scale (ps));
         const float bottomY = (float) h - 4.0f;
         for (float y = bottomY; y > -step; y -= (float) step)
-            glowDot (g, step * 0.5f, y, c, alpha, glow);
-        return img;
-    };
-    bodySprite = column (theme::specLow, 0.42f, false);
-    upperSprite = column (theme::specLow, 0.95f, true);
+            heatDot (g, step * 0.5f, y, heatAt (y));
+    }
 
-    auto single = [&] (juce::Colour c, float alpha)
+    const int sz = juce::roundToInt (halo * 2 + 2);
+    for (size_t i = 0; i < peakSprites.size(); ++i)
     {
-        const int sz = juce::roundToInt (halo * 2 + 2);
-        juce::Image img (juce::Image::ARGB, juce::roundToInt (sz * ps), juce::roundToInt (sz * ps), true);
+        auto& img = peakSprites[i];
+        img = juce::Image (juce::Image::ARGB, juce::roundToInt (sz * ps), juce::roundToInt (sz * ps), true);
         juce::Graphics g (img);
         g.addTransform (juce::AffineTransform::scale (ps));
-        glowDot (g, sz * 0.5f, sz * 0.5f, c, alpha, true);
-        return img;
-    };
-    sparkSprite = single (theme::specHigh, 0.95f);
-    peakSprite = single (theme::specHigh, 1.0f);
+        heatDot (g, sz * 0.5f, sz * 0.5f, juce::jmax (0.6f, (float) i / (float) (peakSprites.size() - 1)));
+    }
 }
 
 void EqDisplay::updateParticles()
@@ -262,16 +284,9 @@ void EqDisplay::drawParticles (juce::Graphics& g)
     buildSprites();
     const int step = dotSpacing;
     const int h = getHeight();
-    const float ps = spritePixelScale;
+    const float ps = layerScale();
     const int bottomY = h - 4;
-    const float w = (float) getWidth();
-
-    auto hash = [] (int a, int b, unsigned c)
-    {
-        unsigned x = (unsigned) a * 73856093u ^ (unsigned) b * 19349663u ^ c * 83492791u;
-        x ^= x >> 13; x *= 0x5bd1e995u; x ^= x >> 15;
-        return (float) (x & 0xffffu) / 65535.0f;
-    };
+    const int srcW = heatColumn.getWidth();
 
     g.setOpacity (juce::jlimit (0.0f, 1.0f, brightness));
     for (int i = 0; i < (int) colTop.size(); ++i)
@@ -280,43 +295,21 @@ void EqDisplay::drawParticles (juce::Graphics& g)
         const int x0 = i * step;
         if (rows > 0)
         {
-            // dim body, brighter glowing top part (top 38 % of the column)
-            const int upperRows = juce::jmax (1, juce::roundToInt (rows * 0.38f));
-            const int bodyRows = rows - upperRows;
-            const int yBodyTop = bottomY - (bodyRows - 1) * step - step / 2;
-            const int yUpperTop = bottomY - (rows - 1) * step - step / 2;
-            if (bodyRows > 0)
-                g.drawImage (bodySprite, x0, yBodyTop, step, h - yBodyTop,
-                             0, juce::roundToInt (yBodyTop * ps), bodySprite.getWidth(), juce::roundToInt ((h - yBodyTop) * ps));
-            const int yUpperBottom = bodyRows > 0 ? yBodyTop : h;
-            g.drawImage (upperSprite, x0, yUpperTop, step, yUpperBottom - yUpperTop,
-                         0, juce::roundToInt (yUpperTop * ps), upperSprite.getWidth(), juce::roundToInt ((yUpperBottom - yUpperTop) * ps));
-
-            // sparks in the second colour, more of them towards the highs and the top of each column
-            const float xr = (float) x0 / w;
-            const float cx = (float) x0 + step * 0.5f;
-            const int sw = sparkSprite.getWidth(), sh = sparkSprite.getHeight();
-            const float half = (float) sw / ps * 0.5f;
-            for (int k = 0; k < rows; ++k)
-            {
-                const float hr = rows > 1 ? (float) k / (float) (rows - 1) : 1.0f;
-                const float prob = (0.04f + 0.32f * xr) * (0.3f + hr);
-                if (hash (i, k, frameCount / (hr > 0.6f ? 1u : 3u)) < prob)
-                {
-                    const float cy = (float) (bottomY - k * step);
-                    g.drawImage (sparkSprite, juce::roundToInt (cx - half), juce::roundToInt (cy - half),
-                                 juce::roundToInt (half * 2), juce::roundToInt (half * 2), 0, 0, sw, sh);
-                }
-            }
+            // one image draw per column: the part of the heat column from its top dot down
+            const int yTop = bottomY - (rows - 1) * step - step / 2;
+            g.drawImage (heatColumn, x0, yTop, step, h - yTop,
+                         0, juce::roundToInt (yTop * ps), srcW, juce::roundToInt ((h - yTop) * ps));
         }
-        // falling peak dot
+        // falling peak dot, coloured by its height
         const float pk = colPeak[(size_t) i];
         if (pk < colTop[(size_t) i] - step || (rows == 0 && pk < bottomY - step))
         {
-            const int sw = peakSprite.getWidth(), sh = peakSprite.getHeight();
-            const float half = (float) sw / ps * 0.5f;
-            g.drawImage (peakSprite, juce::roundToInt ((float) x0 + step * 0.5f - half), juce::roundToInt (pk - half),
-                         juce::roundToInt (half * 2), juce::roundToInt (half * 2), 0, 0, sw, sh);
+            const auto idx = (size_t) juce::jlimit (0, (int) peakSprites.size() - 1,
+                                                    juce::roundToInt (heatAt (pk) * (float) (peakSprites.size() - 1)));
+            const auto& sp = peakSprites[idx];
+            const float half = (float) sp.getWidth() / ps * 0.5f;
+            g.drawImage (sp, juce::roundToInt ((float) x0 + step * 0.5f - half), juce::roundToInt (pk - half),
+                         juce::roundToInt (half * 2), juce::roundToInt (half * 2), 0, 0, sp.getWidth(), sp.getHeight());
         }
     }
     g.setOpacity (1.0f);
@@ -340,11 +333,34 @@ void EqDisplay::rebuildCurves()
 {
     rate = proc.engineSampleRate();
     gainScale = proc.apvts.getRawParameterValue (params::gainScale)->load() / 100.0;
-    const auto transform = proc.currentTransform();
 
+    // what the static curves depend on; recompute them only when this changes
+    juce::uint64 h = 1469598103934665603ull;
+    auto mix = [&h] (double v) { juce::uint64 bits; std::memcpy (&bits, &v, sizeof bits); h = (h ^ bits) * 1099511628211ull; };
+    anyDynamicBand = false;
+    for (int b = 0; b < meq::kNumBands; ++b)
+    {
+        bands[(size_t) b] = proc.readBand (b);
+        const auto& p = bands[(size_t) b];
+        mix (p.enabled ? 1 : 0);
+        if (! p.enabled) continue;
+        mix ((double) (int) p.type); mix (p.freq); mix (p.gain); mix (p.q); mix (p.slope);
+        mix ((double) (int) p.channel); mix (p.bypass ? 1 : 0); mix (p.dynOn ? 1 : 0); mix (p.range);
+        if (p.dynOn && meq::typeUsesGain (p.type) && ! p.bypass) anyDynamicBand = true;
+    }
+    mix (gainScale); mix (rate); mix ((double) (int) proc.currentTransform()); mix (selected); mix ((double) pointFreqs.size());
+
+    if (h != staticKey) computeStatic (h);
+    if (anyDynamicBand) computeLive();
+}
+
+void EqDisplay::computeStatic (juce::uint64 key)
+{
+    staticKey = key;
+    ++staticVersion;
+    const auto transform = proc.currentTransform();
     const size_t np = pointFreqs.size();
     for (auto& v : channelDb) v.assign (np, 0.0f);
-    for (auto& v : channelLiveDb) v.assign (np, 0.0f);
     channelUsed.fill (false);
     channelDynamic.fill (false);
     selRangeDb.clear();
@@ -356,11 +372,8 @@ void EqDisplay::rebuildCurves()
             out[i] = pointFreqs[i] < 0.5 * rate ? (float) c.magnitudeDb (2.0 * meq::kPi * pointFreqs[i] / rate) : -120.0f;
     };
 
-    std::vector<float> liveBand;
-    meq::Cascade live;
     for (int b = 0; b < meq::kNumBands; ++b)
     {
-        bands[(size_t) b] = proc.readBand (b);
         const auto& p = bands[(size_t) b];
         auto& c = cascades[(size_t) b];
         auto& own = bandDb[(size_t) b];
@@ -372,25 +385,13 @@ void EqDisplay::rebuildCurves()
         const int ch = (int) p.channel;
         channelUsed[(size_t) ch] = true;
         if (p.bypass || c.isAllpassOnly) continue;
-
         const bool dyn = p.dynOn && meq::typeUsesGain (p.type);
-        const std::vector<float>* liveSrc = &own;
-        if (dyn)
-        {
-            meq::Engine::designStatic (live, p, gainScale, rate, transform, proc.liveDynDb (b));
-            evalInto (live, liveBand);
-            liveSrc = &liveBand;
-        }
 
         // a stereo band counts in every channel's curve; others only in their own
         for (int k = 0; k < 5; ++k)
         {
             if (ch != 0 && k != ch) continue;
-            for (size_t i = 0; i < np; ++i)
-            {
-                channelDb[(size_t) k][i] += own[i];
-                channelLiveDb[(size_t) k][i] += (*liveSrc)[i];
-            }
+            for (size_t i = 0; i < np; ++i) channelDb[(size_t) k][i] += own[i];
             if (dyn) channelDynamic[(size_t) k] = true;
         }
     }
@@ -402,12 +403,37 @@ void EqDisplay::rebuildCurves()
         if (p.enabled && p.dynOn && meq::typeUsesGain (p.type) && ! bandDb[(size_t) selected].empty())
         {
             meq::Cascade ranged;
-            meq::Engine::designStatic (ranged, p, gainScale, rate, transform, proc.bandValue (selected, pb::range));
+            meq::Engine::designStatic (ranged, p, gainScale, rate, transform, p.range);
             std::vector<float> r;
             evalInto (ranged, r);
             const auto& base = channelDb[(size_t) (int) p.channel];
             selRangeDb.resize (np);
             for (size_t i = 0; i < np; ++i) selRangeDb[i] = base[i] - bandDb[(size_t) selected][i] + r[i];
+        }
+    }
+}
+
+void EqDisplay::computeLive()
+{
+    // channel sums with every dynamic band at its current gain (static curves plus the difference)
+    const auto transform = proc.currentTransform();
+    const size_t np = pointFreqs.size();
+    for (int k = 0; k < 5; ++k) channelLiveDb[(size_t) k] = channelDb[(size_t) k];
+    meq::Cascade live;
+    for (int b = 0; b < meq::kNumBands; ++b)
+    {
+        const auto& p = bands[(size_t) b];
+        if (! p.enabled || p.bypass || ! p.dynOn || ! meq::typeUsesGain (p.type) || bandDb[(size_t) b].size() != np) continue;
+        const float dyn = proc.liveDynDb (b);
+        if (std::abs (dyn) < 0.01f) continue;
+        meq::Engine::designStatic (live, p, gainScale, rate, transform, dyn);
+        const int ch = (int) p.channel;
+        for (size_t i = 0; i < np; ++i)
+        {
+            const float d = (pointFreqs[i] < 0.5 * rate ? (float) live.magnitudeDb (2.0 * meq::kPi * pointFreqs[i] / rate) : -120.0f)
+                          - bandDb[(size_t) b][i];
+            for (int k = 0; k < 5; ++k)
+                if (ch == 0 || k == ch) channelLiveDb[(size_t) k][i] += d;
         }
     }
 }
@@ -480,57 +506,43 @@ bool EqDisplay::showsAuditionButton (int band) const
 }
 
 // ------------------------------------------------------------------ paint
-void EqDisplay::paint (juce::Graphics& g)
+void EqDisplay::paintBackground (juce::Graphics& g)
 {
     const float w = (float) getWidth(), h = (float) getHeight();
     g.fillAll (theme::display);
-
-    // grid
     const double minor[] = { 30, 40, 60, 70, 80, 90, 300, 400, 600, 700, 800, 900, 3000, 4000, 6000, 7000, 8000, 9000 };
     const double major[] = { 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000 };
     g.setColour (theme::gridMinor);
-    for (double f : minor) g.drawVerticalLine (juce::roundToInt (xForFreq (f)), 0.0f, h);
+    for (double f : minor) g.fillRect (juce::Rectangle<float> (std::round (xForFreq (f)), 0.0f, 1.0f, h));
     g.setColour (theme::gridMajor);
-    for (double f : major) g.drawVerticalLine (juce::roundToInt (xForFreq (f)), 0.0f, h);
+    for (double f : major) g.fillRect (juce::Rectangle<float> (std::round (xForFreq (f)), 0.0f, 1.0f, h));
     const float step = dbRange <= 6 ? 2.0f : dbRange <= 12 ? 3.0f : dbRange <= 18 ? 6.0f : 10.0f;
     for (float d = step; d < dbRange; d += step)
     {
-        g.drawHorizontalLine (juce::roundToInt (yForDb (d)), 0.0f, w);
-        g.drawHorizontalLine (juce::roundToInt (yForDb (-d)), 0.0f, w);
+        g.fillRect (juce::Rectangle<float> (0.0f, std::round (yForDb (d)), w, 1.0f));
+        g.fillRect (juce::Rectangle<float> (0.0f, std::round (yForDb (-d)), w, 1.0f));
     }
     g.setColour (theme::zeroLine);
-    g.drawHorizontalLine (juce::roundToInt (yForDb (0)), 0.0f, w);
+    g.fillRect (juce::Rectangle<float> (0.0f, std::round (yForDb (0)), w, 1.0f));
 
-    // analyzer: smooth curves only
-    const float bright = brightness;
-    const auto spectrumStroke = juce::PathStrokeType (1.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
-    if (pre.active)
+    g.setFont (theme::mono (11.0f));
+    g.setColour (theme::muted);
+    for (double f : major)
     {
-        g.setColour (theme::preLine.withMultipliedAlpha (bright));
-        g.strokePath (spectrumPath (pre, false), spectrumStroke);
+        const float x = juce::jmin (w - 34.0f, xForFreq (f) + 4.0f);
+        g.drawText (f >= 1000 ? juce::String ((int) (f / 1000)) + "k" : juce::String ((int) f),
+                    juce::Rectangle<float> (x, h - 18.0f, 40.0f, 14.0f), juce::Justification::centredLeft);
     }
-    if (side.active && proc.sidechainConnected())
+    for (float d = -dbRange + step; d < dbRange; d += step)
     {
-        g.setColour (theme::amber.withAlpha (0.35f * bright));
-        g.strokePath (spectrumPath (side, false), spectrumStroke);
+        const auto label = (d > 0 ? "+" : "") + juce::String ((int) d);
+        g.drawText (label, juce::Rectangle<float> (w - 42.0f, yForDb (d) - 15.0f, 34.0f, 14.0f), juce::Justification::centredRight);
     }
-    if (spectrumStyle == 1)
-    {
-        drawParticles (g);
-    }
-    else if (post.active)
-    {
-        // gradient from the low-frequency colour to the high-frequency colour
-        juce::ColourGradient fillGrad (theme::specLow.withAlpha (juce::jmin (1.0f, theme::specFill * bright)), 0.0f, 0.0f,
-                                       theme::specHigh.withAlpha (juce::jmin (1.0f, theme::specFill * bright)), w, 0.0f, false);
-        g.setGradientFill (fillGrad);
-        g.fillPath (spectrumPath (post, true));
-        juce::ColourGradient lineGrad (theme::specLow.withMultipliedAlpha (juce::jmin (1.0f, 0.9f * bright)), 0.0f, 0.0f,
-                                       theme::specHigh.withMultipliedAlpha (juce::jmin (1.0f, 0.9f * bright)), w, 0.0f, false);
-        g.setGradientFill (lineGrad);
-        g.strokePath (spectrumPath (post, false), spectrumStroke);
-    }
+}
 
+void EqDisplay::paintCurves (juce::Graphics& g)
+{
+    const float w = (float) getWidth(), h = (float) getHeight();
     const float y0 = yForDb (0);
     const auto curveStroke = juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
 
@@ -553,7 +565,7 @@ void EqDisplay::paint (juce::Graphics& g)
     }
 
     // dynamic range of the selected band: between its channel's curve and that curve with the range applied
-    if (! selRangeDb.empty())
+    if (! selRangeDb.empty() && juce::isPositiveAndBelow (selected, meq::kNumBands))
     {
         const auto& base = channelDb[(size_t) (int) bands[(size_t) selected].channel];
         const size_t np = selRangeDb.size();
@@ -587,13 +599,80 @@ void EqDisplay::paint (juce::Graphics& g)
         }
         g.setColour (col);
         g.strokePath (cp, curveStroke);
-        if (channelDynamic[(size_t) k])
+    }
+}
+
+void EqDisplay::paint (juce::Graphics& g)
+{
+    const float w = (float) getWidth(), h = (float) getHeight();
+    const float ls = layerScale();
+    const auto sizeKey = juce::String (getWidth()) + "x" + juce::String (getHeight()) + "@" + juce::String (ls);
+
+    // cached background (grid, labels): redrawn only on resize / scale / theme / dB range change
+    const auto bgKey = sizeKey + "|" + juce::String (dbRange) + "|" + juce::String (theme::version);
+    if (bgKey != backgroundKey || ! backgroundLayer.isValid())
+    {
+        backgroundKey = bgKey;
+        backgroundLayer = juce::Image (juce::Image::RGB, juce::jmax (1, juce::roundToInt (w * ls)), juce::jmax (1, juce::roundToInt (h * ls)), false);
+        juce::Graphics lg (backgroundLayer);
+        lg.addTransform (juce::AffineTransform::scale (ls));
+        paintBackground (lg);
+    }
+    g.drawImage (backgroundLayer, getLocalBounds().toFloat());
+
+    // analyzer (changes every frame)
+    const float bright = brightness;
+    const auto spectrumStroke = juce::PathStrokeType (1.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
+    if (pre.active)
+    {
+        g.setColour (theme::preLine.withMultipliedAlpha (bright));
+        g.strokePath (spectrumPath (pre, false), spectrumStroke);
+    }
+    if (side.active && proc.sidechainConnected())
+    {
+        g.setColour (theme::amber.withAlpha (0.35f * bright));
+        g.strokePath (spectrumPath (side, false), spectrumStroke);
+    }
+    if (spectrumStyle == 1)
+    {
+        drawParticles (g);
+    }
+    else if (post.active)
+    {
+        // gradient from the low-frequency colour to the high-frequency colour
+        juce::ColourGradient fillGrad (theme::specLow.withAlpha (juce::jmin (1.0f, theme::specFill * bright)), 0.0f, 0.0f,
+                                       theme::specHigh.withAlpha (juce::jmin (1.0f, theme::specFill * bright)), w, 0.0f, false);
+        g.setGradientFill (fillGrad);
+        g.fillPath (spectrumPath (post, true));
+        juce::ColourGradient lineGrad (theme::specLow.withMultipliedAlpha (juce::jmin (1.0f, 0.9f * bright)), 0.0f, 0.0f,
+                                       theme::specHigh.withMultipliedAlpha (juce::jmin (1.0f, 0.9f * bright)), w, 0.0f, false);
+        g.setGradientFill (lineGrad);
+        g.strokePath (spectrumPath (post, false), spectrumStroke);
+    }
+
+    // cached curves: redrawn only when a band, the selection, the size or the theme changes
+    const auto cKey = sizeKey + "|" + juce::String (staticVersion) + "|" + juce::String (dbRange) + "|"
+                    + juce::String (theme::version) + "|" + juce::String (spectrumStyle);
+    if (cKey != curveKey || ! curveLayer.isValid())
+    {
+        curveKey = cKey;
+        curveLayer = juce::Image (juce::Image::ARGB, juce::jmax (1, juce::roundToInt (w * ls)), juce::jmax (1, juce::roundToInt (h * ls)), true);
+        juce::Graphics lg (curveLayer);
+        lg.addTransform (juce::AffineTransform::scale (ls));
+        paintCurves (lg);
+    }
+    g.drawImage (curveLayer, getLocalBounds().toFloat());
+
+    // live dynamic curves (thin, every frame, only when a band is dynamic)
+    if (anyDynamicBand)
+    {
+        const bool anyBandOn = std::any_of (channelUsed.begin(), channelUsed.end(), [] (bool u) { return u; });
+        for (int k = 0; k < 5; ++k)
         {
-            juce::Path dashed;
-            const float dashes[] = { 4.0f, 3.0f };
-            juce::PathStrokeType (1.2f).createDashedStroke (dashed, curvePath (channelLiveDb[(size_t) k]), dashes, 2);
-            g.setColour (col.withAlpha (0.8f));
-            g.fillPath (dashed);
+            if (! channelDynamic[(size_t) k] || channelLiveDb[(size_t) k].size() != pointFreqs.size()) continue;
+            if (k == 0 && ! channelUsed[0] && anyBandOn) continue;
+            g.setColour ((k == 0 ? theme::text : theme::channelColour (k)).withAlpha (0.65f));
+            g.strokePath (curvePath (channelLiveDb[(size_t) k]), juce::PathStrokeType (1.2f));
         }
     }
 
@@ -637,21 +716,6 @@ void EqDisplay::paint (juce::Graphics& g)
         g.drawRoundedRectangle (banner.toFloat(), 13.0f, 1.0f);
         g.setColour (theme::text);
         g.drawText (text, banner.withTrimmedLeft (18), juce::Justification::centred);
-    }
-
-    // labels
-    g.setFont (theme::mono (11.0f));
-    g.setColour (theme::muted);
-    for (double f : major)
-    {
-        const float x = juce::jmin (w - 34.0f, xForFreq (f) + 4.0f);
-        g.drawText (f >= 1000 ? juce::String ((int) (f / 1000)) + "k" : juce::String ((int) f),
-                    juce::Rectangle<float> (x, h - 18.0f, 40.0f, 14.0f), juce::Justification::centredLeft);
-    }
-    for (float d = -dbRange + step; d < dbRange; d += step)
-    {
-        const auto label = (d > 0 ? "+" : "") + juce::String ((int) d);
-        g.drawText (label, juce::Rectangle<float> (w - 42.0f, yForDb (d) - 15.0f, 34.0f, 14.0f), juce::Justification::centredRight);
     }
 
     // spectrum grab hint
@@ -785,11 +849,11 @@ void EqDisplay::paint (juce::Graphics& g)
     for (int k = 0; k < 5; ++k)
         if (channelUsed[(size_t) k]) legend (k == 0 ? theme::text : theme::channelColour (k), chNames[k], false);
     if (std::any_of (channelDynamic.begin(), channelDynamic.end(), [] (bool d) { return d; }))
-        legend (theme::muted, "Dashed: live dynamics", false);
+        legend (theme::muted, "Thin line: live dynamics", false);
     if (! selRangeDb.empty()) legend (theme::amber.withAlpha (0.6f), "Dynamic range", true);
     if (side.active && proc.sidechainConnected()) legend (theme::amber.withAlpha (0.5f), "Sidechain", false);
 
-    if (! anyBand)
+    if (std::none_of (channelUsed.begin(), channelUsed.end(), [] (bool u) { return u; }))
     {
         g.setColour (theme::muted);
         g.setFont (theme::font (13.0f));

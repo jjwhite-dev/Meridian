@@ -26,7 +26,7 @@ public:
     TypeSelector();
     void attach (juce::RangedAudioParameter* p);
     void detach();
-    void setColour (juce::Colour c) { colour = c; repaint(); }
+    void setColour (juce::Colour c) { if (c != colour) { colour = c; repaint(); } }
 
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;

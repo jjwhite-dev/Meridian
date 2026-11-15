@@ -146,7 +146,7 @@ void MeridianEditor::timerCallback()
     if (selected >= 0 && proc.bandValue (selected, params::band::on) < 0.5f)
         selectBand (-1);
     display.refresh();
-    strip.repaint();
+    strip.refresh();
     header.update();
     bandPanel.update();
     dynamicsPanel.update();

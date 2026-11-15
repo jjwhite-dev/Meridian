@@ -1,0 +1,49 @@
+Meridian EQ — Proprietary License
+
+Copyright (c) 2026 jjwhite-dev. All rights reserved.
+
+This repository contains the source code of the Meridian EQ audio plugin
+(the "Software") and any plugin binaries built from it (the "Plugin").
+
+1. No license is granted. Except for the limited viewing right in section 2,
+   no right or license to the Software or the Plugin is granted to you,
+   whether expressly, by implication, by estoppel or otherwise.
+
+2. Viewing only. You may view the Software on GitHub, and GitHub may create
+   copies ("forks") on its own service as its Terms of Service require for
+   public repositories. This does not allow you to do anything else with
+   the Software or the Plugin.
+
+3. Prohibited. Without the prior written permission of the copyright holder
+   you may not, in whole or in part:
+   a) use, run, install or load the Software or the Plugin, in any host or
+      environment, for any purpose, commercial or non-commercial;
+   b) copy, reproduce, modify, translate, adapt or create derivative works
+      of the Software or the Plugin, or incorporate any part of the Software
+      into other software;
+   c) sell, resell, rent, lease, lend, sublicense, distribute, publish,
+      share or otherwise make the Software or the Plugin available to
+      anyone, whether for payment or free of charge;
+   d) build, compile or package the Software, or distribute builds of it;
+   e) use the Software, the Plugin or any part of them to train, fine-tune
+      or evaluate machine-learning models;
+   f) remove or alter this notice or any copyright notice.
+
+4. Third-party components. The Software is built with the JUCE framework,
+   which is licensed separately by its owner under its own terms; this
+   license does not cover JUCE. Any other third-party material keeps its
+   own license.
+
+5. Permission requests. To ask for permission for any use not allowed
+   above, contact the copyright holder through the GitHub account
+   jjwhite-dev.
+
+6. No warranty. The Software and the Plugin are provided "as is", without
+   warranty of any kind, express or implied, including but not limited to
+   the warranties of merchantability, fitness for a particular purpose and
+   non-infringement. In no event shall the copyright holder be liable for
+   any claim, damages or other liability arising from, out of or in
+   connection with the Software or the Plugin.
+
+7. Termination. Any use in breach of this license is unauthorised and
+   infringes the copyright holder's rights.

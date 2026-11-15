@@ -50,6 +50,7 @@ public:
 
 private:
     MeridianProcessor& proc;
+    juce::String shownPreset;
     IconButton undo { "Undo (Ctrl/Cmd+Z)", icons::undo() };
     IconButton redo { "Redo (Ctrl/Cmd+Shift+Z)", icons::redo() };
     PresetBar presetBar;
@@ -68,8 +69,11 @@ public:
 
     int selected = -1;
     std::function<void (int)> onSelect;
+    /** Repaints only when the bands it shows changed. */
+    void refresh();
 
 private:
+    juce::uint64 shownKey = 0;
     struct Chip { int band; juce::Rectangle<float> r; };
     std::vector<Chip> layoutChips() const;
     juce::Rectangle<float> addButtonArea (const std::vector<Chip>&) const;
@@ -92,6 +96,7 @@ public:
 private:
     MeridianProcessor& proc;
     int band = -1;
+    int coloursVersion = -1;
     TypeSelector type;
     Knob freq { "Frequency" }, gain { "Gain", false, true }, q { "Q" }, slope { "Slope" };
     SegmentedControl channel { { "Stereo", "L", "R", "M", "S" } };

@@ -31,6 +31,8 @@ namespace theme
     inline juce::Colour text, textDim, muted, faint, accent, amber, onAccent;
     inline juce::Colour specLow, specHigh, preLine, zeroLine, banner, dim, nodeFill;
     inline float specFill = 0.14f;
+    /** Incremented by apply(): lets cached drawings know the colours changed. */
+    inline int version = 0;
     inline std::array<juce::Colour, 5> channels;
 
     /** One colour per processing channel: Stereo, Left, Right, Mid, Side. */

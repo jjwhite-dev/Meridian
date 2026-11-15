@@ -158,7 +158,11 @@ void HeaderBar::update()
 {
     undo.setEnabled (proc.undoManager.canUndo());
     redo.setEnabled (proc.undoManager.canRedo());
-    presetBar.repaint();
+    if (proc.presets.currentName() != shownPreset)
+    {
+        shownPreset = proc.presets.currentName();
+        presetBar.repaint();
+    }
 }
 
 void HeaderBar::paint (juce::Graphics& g)
@@ -199,6 +203,22 @@ void HeaderBar::resized()
 
 // ================================================================== BandStrip
 BandStrip::BandStrip (MeridianProcessor& p) : proc (p) {}
+
+void BandStrip::refresh()
+{
+    juce::uint64 h = 1469598103934665603ull;
+    auto mix = [&h] (juce::uint64 v) { h = (h ^ v) * 1099511628211ull; };
+    for (int b = 0; b < meq::kNumBands; ++b)
+    {
+        const auto d = proc.readBand (b);
+        mix (d.enabled ? 1u : 0u);
+        if (! d.enabled) continue;
+        mix ((juce::uint64) d.type + 16u * (juce::uint64) d.channel + 256u * (d.bypass ? 1u : 0u) + 512u * (d.dynOn ? 1u : 0u));
+    }
+    mix ((juce::uint64) (selected + 1));
+    mix ((juce::uint64) theme::version);
+    if (h != shownKey) { shownKey = h; repaint(); }
+}
 
 juce::String BandStrip::chipLabel (int b, const meq::BandParams& d)
 {
@@ -355,8 +375,12 @@ void BandPanel::setBand (int b)
 
 void BandPanel::update()
 {
-    channel.setOptionColours ({ theme::channelColour (0), theme::channelColour (1), theme::channelColour (2),
-                                theme::channelColour (3), theme::channelColour (4) });
+    if (coloursVersion != theme::version)
+    {
+        coloursVersion = theme::version;
+        channel.setOptionColours ({ theme::channelColour (0), theme::channelColour (1), theme::channelColour (2),
+                                    theme::channelColour (3), theme::channelColour (4) });
+    }
     if (band < 0) return;
     const auto t = (meq::FilterType) juce::roundToInt (proc.bandValue (band, pb::type));
     gain.setEnabled (meq::typeUsesGain (t));

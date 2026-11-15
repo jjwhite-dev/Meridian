@@ -98,6 +98,7 @@ void apply (const Palette& p)
     specHigh = p.specHigh;
     specFill = p.specFill;
     channels = { p.stereo, p.left, p.right, p.mid, p.side };
+    ++version;
 }
 
 } // namespace theme

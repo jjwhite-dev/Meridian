@@ -1,4 +1,8 @@
-# Meridian EQ — prototype 0.2.1
+# Meridian EQ — prototype 0.2.2
+
+> **Proprietary.** Copyright (c) 2026 jjwhite-dev, all rights reserved. Using,
+> copying, modifying, building, distributing or reselling the code or the
+> plugin is not permitted without written permission. See [LICENSE](LICENSE).
 
 A 32-band parametric / dynamic EQ plugin (VST3 on Windows and macOS, AU on
 macOS) with a GPU-drawn interface. This is the first working prototype: the
@@ -73,9 +77,10 @@ below).
   2× oversampling, phase mode.
 - **Options** (gear, top right): a panel slides in from the right with
   - Display: spectrum style — **Smooth** (filled curve) or **Particles**
-    (columns of glowing dots in the spectrum's low colour, sparks in its high
-    colour that get denser towards the highs, and peak dots that hang and
-    fall; the EQ curve gets a soft glow), with dot size and dot spacing;
+    (columns of dots coloured as a heatmap from the bottom (cool, dim) to
+    the top (hot, bright, glowing), built from the two spectrum colours, with
+    peak dots that hang and fall; the EQ curve gets a soft glow), with dot
+    size and dot spacing;
     spectrum refresh rate (default 60 fps), resolution (default High),
     brightness, EQ scale.
   - Interface: size 80 / 100 / 125 / 150 / 175 / 200 %, and the renderer:

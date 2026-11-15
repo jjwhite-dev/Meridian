@@ -77,6 +77,12 @@ private:
     void updateParticles();
     void buildSprites();
     void drawParticles (juce::Graphics&);
+    void computeStatic (juce::uint64 key);
+    void computeLive();
+    void paintBackground (juce::Graphics&);   // grid + labels (cached)
+    void paintCurves (juce::Graphics&);       // band curves, fills, channel sums (cached)
+    juce::Colour heatColour (float t) const;
+    float heatAt (float y) const;
 
     int nodeAt (juce::Point<float>) const;
     int auditionButtonAt (juce::Point<float>) const;
@@ -108,8 +114,17 @@ private:
     unsigned frameCount = 0;
     std::vector<float> colTop, colPeak;      // per column: y of the top dot row, y of the falling peak dot
     std::vector<int> colRows;                // per column: number of dot rows
-    juce::Image bodySprite, upperSprite, sparkSprite, peakSprite;
+    juce::Image heatColumn;                  // one column of dots, coloured bottom (cool) to top (hot)
+    std::array<juce::Image, 16> peakSprites; // falling peak dots at 16 heat levels
     juce::String spriteKey;
+
+    // cached layers: only redrawn when what they show changes
+    juce::Image backgroundLayer, curveLayer;
+    juce::String backgroundKey, curveKey;
+    juce::uint64 staticKey = 0;
+    int staticVersion = 0;
+    bool anyDynamicBand = false;
+    float layerScale() const;
     static constexpr float spritePixelScale = 2.0f;
     double specRate = 48000.0;
 
