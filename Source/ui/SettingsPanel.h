@@ -9,6 +9,9 @@ class SettingsPanel : public juce::Component, private juce::Timer, private juce:
 {
 public:
     explicit SettingsPanel (GlobalSettings&);
+
+    /** "Save as default" and "Reset to factory" (the editor also handles the EQ part). */
+    std::function<void()> onSaveDefaults, onResetDefaults;
     ~SettingsPanel() override;
 
     void open();

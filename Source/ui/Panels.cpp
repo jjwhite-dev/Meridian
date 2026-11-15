@@ -82,6 +82,11 @@ void PresetBar::showMenu()
     menu.addItem (3, juce::String (juce::CharPointer_UTF8 ("Load from file\xe2\x80\xa6")));
     menu.addItem (4, "Show presets folder");
     menu.addSeparator();
+    menu.addSectionHeader ("Startup");
+    menu.addItem (6, "Save as default (EQ and options)");
+    menu.addItem (7, "Load default", PresetManager::defaultFile().existsAsFile());
+    menu.addItem (8, "Reset defaults to factory");
+    menu.addSeparator();
     menu.addItem (5, "Init (all bands off)");
 
     juce::Component::SafePointer<PresetBar> safe (this);
@@ -95,6 +100,9 @@ void PresetBar::showMenu()
         else if (r == 3) safe->loadFromFile();
         else if (r == 4) PresetManager::folder().revealToUser();
         else if (r == 5) pm.loadInit();
+        else if (r == 6) { pm.saveAsDefault(); safe->proc.uiSettings->saveAsDefaults(); }
+        else if (r == 7) pm.loadStartupDefault();
+        else if (r == 8) { pm.clearDefault(); safe->proc.uiSettings->resetToFactory(); }
         safe->repaint();
     });
 }

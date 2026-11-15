@@ -6,6 +6,7 @@
 #include "AnalyzerFifo.h"
 #include "Params.h"
 #include "PresetManager.h"
+#include "ui/GlobalSettings.h"
 #include "dsp/EqEngine.h"
 
 class MeridianProcessor : public juce::AudioProcessor
@@ -43,6 +44,8 @@ public:
     juce::UndoManager undoManager;
     juce::AudioProcessorValueTreeState apvts;
     PresetManager presets { *this };
+    /** Interface options, kept alive for as long as the plugin is loaded. */
+    juce::SharedResourcePointer<GlobalSettings> uiSettings;
     AnalyzerFifo preFifo, postFifo, sidechainFifo;
 
     /** Band being auditioned (-1 = none). Written by the editor. */

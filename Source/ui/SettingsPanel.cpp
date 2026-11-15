@@ -162,19 +162,22 @@ public:
         size.onChange = [this] (int i) { settings.uiScale = GlobalSettings::uiScales()[(size_t) i]; settings.changed(); };
         renderer.onChange = [this] (int i) { settings.gpu = i == 0; settings.changed(); };
         style.onChange = [this] (int i) { settings.spectrumStyle = i; settings.changed(); resized(); };
+        grab.onChange = [this] (int i) { settings.spectrumGrab = i == 1; settings.changed(); };
+        saveDefaults.onClick = [this] { if (onSave) onSave(); saved = juce::Time::getMillisecondCounter(); repaint(); };
+        resetDefaults.onClick = [this] { if (onReset) onReset(); };
 
         dot.slider.setRange (1.4, 4.0, 0.1);
         dot.slider.textFromValueFunction = [] (double v) { return juce::String (v, 1) + " px"; };
-        dot.slider.onDragEnd = [this] { settings.save(); };
+        dot.slider.onDragEnd = [] {};
         dot.slider.onValueChange = [this] { dot.repaint(); settings.particleDot = (float) dot.slider.getValue(); settings.sendChangeMessage(); };
         spacing.slider.setRange (4.0, 10.0, 1.0);
         spacing.slider.textFromValueFunction = [] (double v) { return juce::String (juce::roundToInt (v)) + " px"; };
-        spacing.slider.onDragEnd = [this] { settings.save(); };
+        spacing.slider.onDragEnd = [] {};
         spacing.slider.onValueChange = [this] { spacing.repaint(); settings.particleSpacing = juce::roundToInt (spacing.slider.getValue()); settings.sendChangeMessage(); };
 
         brightness.slider.setRange (50.0, 150.0, 1.0);
         brightness.slider.textFromValueFunction = [] (double v) { return juce::String (juce::roundToInt (v)) + "%"; };
-        brightness.slider.onDragEnd = [this] { settings.save(); };
+        brightness.slider.onDragEnd = [] {};
         brightness.slider.onValueChange = [this]
         {
             brightness.repaint();
@@ -205,7 +208,8 @@ public:
         for (juce::Component* c : { (juce::Component*) &refresh, (juce::Component*) &resolution, (juce::Component*) &brightness,
                                     (juce::Component*) &scale, (juce::Component*) &size, (juce::Component*) &renderer,
                                     (juce::Component*) &fill, (juce::Component*) &reset, (juce::Component*) &style,
-                                    (juce::Component*) &dot, (juce::Component*) &spacing })
+                                    (juce::Component*) &dot, (juce::Component*) &spacing, (juce::Component*) &grab,
+                                    (juce::Component*) &saveDefaults, (juce::Component*) &resetDefaults })
             addAndMakeVisible (c);
 
         for (int i = 0; i < (int) theme::presets().size(); ++i)
@@ -229,6 +233,7 @@ public:
         for (int i = 0; i < (int) sc.size(); ++i) if (std::abs (settings.uiScale - sc[(size_t) i]) < 0.01f) size.setSelected (i);
         renderer.setSelected (settings.gpu ? 0 : 1);
         style.setSelected (settings.spectrumStyle);
+        grab.setSelected (settings.spectrumGrab ? 1 : 0);
         dot.slider.setValue (settings.particleDot, juce::dontSendNotification);
         spacing.slider.setValue (settings.particleSpacing, juce::dontSendNotification);
         dot.setEnabled (settings.spectrumStyle == 1);
@@ -248,6 +253,11 @@ public:
         g.setColour (theme::muted.withAlpha (0.8f));
         g.setFont (theme::font (11.0f));
         g.drawText ("Current: " + settings.palette.name, customNote, juce::Justification::centredLeft);
+        if (saved != 0 && juce::Time::getMillisecondCounter() - saved < 4000)
+        {
+            g.setColour (theme::accent);
+            g.drawText ("Saved as default", saveDefaults.getBounds().translated (0, 34).withHeight (14), juce::Justification::centred);
+        }
     }
 
     void resized() override
@@ -274,6 +284,7 @@ public:
         row ("Spectrum resolution", resolution);
         brightness.setBounds (16, y, w, 34); y += 48;
         row ("EQ scale", scale);
+        row ("Spectrum Grab (click a peak to add a band on it)", grab);
 
         y += 6;
         heading ("Interface");
@@ -293,7 +304,13 @@ public:
         for (auto* r : rows) { r->setBounds (12, y, w + 8, 28); y += 30; }
         y += 8;
         fill.setBounds (16, y, w, 34); y += 48;
-        reset.setBounds (16, y, w, 30); y += 50;
+        reset.setBounds (16, y, w, 30); y += 44;
+
+        heading ("Startup");
+        labels.push_back ({ "New instances start with the saved default EQ and options.", { 16, y - 6, w, 16 } });
+        y += 16;
+        saveDefaults.setBounds (16, y, w, 32); y += 40;
+        resetDefaults.setBounds (16, y, w, 30); y += 54;
 
         if (getHeight() != y) setSize (getWidth(), y);
     }
@@ -308,6 +325,11 @@ public:
     SegmentedControl renderer { { "GPU (OpenGL)", "CPU (software)" } };
     SegmentedControl style { { "Smooth", "Particles" } };
     BarSlider dot { "Dot size" }, spacing { "Dot spacing" };
+    SegmentedControl grab { { "Off", "On" } };
+    juce::TextButton saveDefaults { "Save current EQ and options as default" };
+    juce::TextButton resetDefaults { "Reset defaults to factory" };
+    std::function<void()> onSave, onReset;
+    juce::uint32 saved = 0;
     BarSlider fill { "Spectrum fill opacity" };
     juce::TextButton reset { "Reset colours to preset" };
     juce::OwnedArray<juce::Component> cards, rows;
@@ -322,6 +344,8 @@ public:
 SettingsPanel::SettingsPanel (GlobalSettings& s) : settings (s)
 {
     content = std::make_unique<Content> (settings);
+    content->onSave = [this] { if (onSaveDefaults) onSaveDefaults(); };
+    content->onReset = [this] { if (onResetDefaults) onResetDefaults(); };
     viewport.setViewedComponent (content.get(), false);
     viewport.setScrollBarsShown (true, false);
     viewport.setScrollBarThickness (8);

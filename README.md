@@ -1,4 +1,4 @@
-# Meridian EQ — prototype 0.2.2
+# Meridian EQ — prototype 0.3.0
 
 > **Proprietary.** Copyright (c) 2026 jjwhite-dev, all rights reserved. Using,
 > copying, modifying, building, distributing or reselling the code or the
@@ -36,10 +36,22 @@ below).
   empty space in the display, the band strip, the header, the Global panel or
   between panels (or press Esc) to deselect.
 
-- **Add a band**: double-click the display (a bell at that spot), click
-  **+ Add band**, or *Spectrum Grab*: move the mouse near a peak in the
-  analyzer until a dashed ring appears, then click and drag. That creates a
-  narrow bell on the peak and keeps dragging it.
+- **Add a band**: double-click the display (a bell at that spot) or click
+  **+ Add band**. Optional *Spectrum Grab* (off by default, Options →
+  Display): move the mouse near a peak in the analyzer until a dashed ring
+  appears, then click and drag; that puts a narrow bell exactly on the peak,
+  handy for cutting a resonance.
+- **Freeze**: the button at the top right of the display holds the input
+  spectrum (averaged over the last half second). While frozen, the faint
+  line is the held input and the main spectrum becomes a ghost: the held
+  input with your current EQ applied, updating as you move bands, so you can
+  EQ the frozen sound and see the result. Click again to go back to live.
+- **Startup defaults**: new instances start from your saved default EQ and
+  options. "Save as default" is in the preset menu and at the bottom of the
+  options panel (it saves both); "Reset defaults to factory" goes back to
+  Init and the factory options. Option changes apply straight away but are
+  only kept for the next start when you save them as default. Sessions in
+  your DAW always recall their own EQ settings.
 - **Edit**: drag a dot (left/right = frequency, up/down = gain; hold Shift to
   change only the gain), mouse wheel over a dot for Q, double-click a dot to
   delete it, right-click for type, channel, dynamics, bypass and solo.

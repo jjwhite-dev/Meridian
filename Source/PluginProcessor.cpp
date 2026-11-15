@@ -26,6 +26,10 @@ MeridianProcessor::MeridianProcessor()
     pAutoGain  = apvts.getRawParameterValue (params::autoGain);
     pMonitor   = apvts.getRawParameterValue (params::monitor);
     pLookahead = apvts.getRawParameterValue (params::lookahead);
+
+    // a new instance starts from the user's default (a saved session overrides this in setStateInformation)
+    presets.loadStartupDefault();
+    undoManager.clearUndoHistory();
 }
 
 bool MeridianProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const

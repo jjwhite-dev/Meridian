@@ -46,6 +46,44 @@ EqDisplay::EqDisplay (MeridianProcessor& p) : proc (p)
         gridFreqs[(size_t) i] = kMinF * std::pow (kMaxF / kMinF, (double) i / (kGridPoints - 1));
     setAnalyzerOrder (12);
     setOpaque (true);
+
+    freezeButton.setClickingTogglesState (true);
+    freezeButton.setTooltip ("Freeze the spectrum and see the frozen sound with your EQ applied (ghost spectrum)");
+    freezeButton.onClick = [this] { setFrozen (freezeButton.getToggleState()); };
+    addAndMakeVisible (freezeButton);
+}
+
+void EqDisplay::setFrozen (bool shouldFreeze)
+{
+    frozen = shouldFreeze && pre.active;
+    freezeButton.setToggleState (frozen, juce::dontSendNotification);
+    freezeButton.setButtonText (frozen ? "Frozen" : "Freeze");
+    if (frozen)
+    {
+        frozenInput.grid = pre.avg;
+        frozenInput.active = true;
+        ghost.grid = frozenInput.grid;
+        ghost.active = true;
+        grabCandidate = false;
+        updateGhost();
+    }
+    repaint();
+}
+
+void EqDisplay::updateGhost()
+{
+    if (! frozen || weightedDb.empty() || frozenInput.grid.size() != (size_t) kGridPoints) return;
+    ghost.grid.resize ((size_t) kGridPoints);
+    const float w = (float) juce::jmax (1, getWidth());
+    const size_t np = weightedDb.size();
+    for (int g = 0; g < kGridPoints; ++g)
+    {
+        const float pos = xForFreq (gridFreqs[(size_t) g]) / w * (float) (np - 1);
+        const size_t i = (size_t) juce::jlimit (0, (int) np - 2, (int) pos);
+        const float t = juce::jlimit (0.0f, 1.0f, pos - (float) i);
+        const float eq = weightedDb[i] * (1 - t) + weightedDb[i + 1] * t;
+        ghost.grid[(size_t) g] = frozenInput.grid[(size_t) g] + eq;
+    }
 }
 
 void EqDisplay::setAnalyzerOrder (int order)
@@ -62,6 +100,7 @@ void EqDisplay::setAnalyzerOrder (int order)
         s->ring.assign ((size_t) n, 0.0f);
         s->db.assign ((size_t) n / 2 + 1, -120.0f);
         s->grid.assign ((size_t) kGridPoints, -120.0f);
+        s->avg.assign ((size_t) kGridPoints, -120.0f);
         s->write = 0;
     }
 }
@@ -169,6 +208,8 @@ void EqDisplay::analyse (Spectrum& s)
         const float db = (float) (10.0 * std::log10 (pw + 1e-18));
         float& v = s.grid[(size_t) g];
         v = db > v ? v + (db - v) * 0.6f : v + (db - v) * 0.15f;
+        float& a = s.avg[(size_t) g];
+        a = a < -110.0f ? v : a + (v - a) * 0.04f;
     }
 }
 
@@ -269,8 +310,9 @@ void EqDisplay::updateParticles()
     {
         const float xc = (float) (i * step) + step * 0.5f;
         const double f = freqForX (xc);
-        const float yTop = juce::jlimit (6.0f, bottomY + 1.0f, ySpec (gridDbAt (post, f), f));
-        const int rows = post.active ? juce::jmax (0, (int) std::floor ((bottomY - yTop) / (float) step) + 1) : 0;
+        const auto& main = mainSpectrum();
+        const float yTop = juce::jlimit (6.0f, bottomY + 1.0f, ySpec (gridDbAt (main, f), f));
+        const int rows = main.active ? juce::jmax (0, (int) std::floor ((bottomY - yTop) / (float) step) + 1) : 0;
         const float topRowY = bottomY - (float) (juce::jmax (1, rows) - 1) * step;
         colRows[(size_t) i] = rows;
         colTop[(size_t) i] = topRowY;
@@ -324,8 +366,9 @@ void EqDisplay::refresh()
     analyse (pre);
     analyse (post);
     if (side.active) analyse (side);
-    if (spectrumStyle == 1) updateParticles();
     rebuildCurves();
+    updateGhost();
+    if (spectrumStyle == 1) updateParticles();
     repaint();
 }
 
@@ -361,6 +404,7 @@ void EqDisplay::computeStatic (juce::uint64 key)
     const auto transform = proc.currentTransform();
     const size_t np = pointFreqs.size();
     for (auto& v : channelDb) v.assign (np, 0.0f);
+    weightedDb.assign (np, 0.0f);
     channelUsed.fill (false);
     channelDynamic.fill (false);
     selRangeDb.clear();
@@ -386,6 +430,8 @@ void EqDisplay::computeStatic (juce::uint64 key)
         channelUsed[(size_t) ch] = true;
         if (p.bypass || c.isAllpassOnly) continue;
         const bool dyn = p.dynOn && meq::typeUsesGain (p.type);
+        const float wgt = ch == 0 || ch == 3 ? 1.0f : ch == 4 ? 0.25f : 0.5f;
+        for (size_t i = 0; i < np; ++i) weightedDb[i] += wgt * own[i];
 
         // a stereo band counts in every channel's curve; others only in their own
         for (int k = 0; k < 5; ++k)
@@ -444,6 +490,7 @@ void EqDisplay::resized()
     pointFreqs.resize ((size_t) np);
     for (int i = 0; i < np; ++i) pointFreqs[(size_t) i] = freqForX ((float) i * getWidth() / (float) (np - 1));
     dbLabelArea = getLocalBounds().removeFromRight (44);
+    freezeButton.setBounds (getWidth() - 44 - 92, 8, 86, 26);
     rebuildCurves();
 }
 
@@ -623,7 +670,13 @@ void EqDisplay::paint (juce::Graphics& g)
     // analyzer (changes every frame)
     const float bright = brightness;
     const auto spectrumStroke = juce::PathStrokeType (1.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
-    if (pre.active)
+    if (frozen)
+    {
+        // the held input, as a faint outline under the ghost
+        g.setColour (theme::muted.withAlpha (0.55f * bright));
+        g.strokePath (spectrumPath (frozenInput, false), juce::PathStrokeType (1.0f));
+    }
+    else if (pre.active)
     {
         g.setColour (theme::preLine.withMultipliedAlpha (bright));
         g.strokePath (spectrumPath (pre, false), spectrumStroke);
@@ -637,17 +690,18 @@ void EqDisplay::paint (juce::Graphics& g)
     {
         drawParticles (g);
     }
-    else if (post.active)
+    else if (mainSpectrum().active)
     {
+        const auto& shown = mainSpectrum();
         // gradient from the low-frequency colour to the high-frequency colour
         juce::ColourGradient fillGrad (theme::specLow.withAlpha (juce::jmin (1.0f, theme::specFill * bright)), 0.0f, 0.0f,
                                        theme::specHigh.withAlpha (juce::jmin (1.0f, theme::specFill * bright)), w, 0.0f, false);
         g.setGradientFill (fillGrad);
-        g.fillPath (spectrumPath (post, true));
+        g.fillPath (spectrumPath (shown, true));
         juce::ColourGradient lineGrad (theme::specLow.withMultipliedAlpha (juce::jmin (1.0f, 0.9f * bright)), 0.0f, 0.0f,
                                        theme::specHigh.withMultipliedAlpha (juce::jmin (1.0f, 0.9f * bright)), w, 0.0f, false);
         g.setGradientFill (lineGrad);
-        g.strokePath (spectrumPath (post, false), spectrumStroke);
+        g.strokePath (spectrumPath (shown, false), spectrumStroke);
     }
 
     // cached curves: redrawn only when a band, the selection, the size or the theme changes
@@ -819,7 +873,7 @@ void EqDisplay::paint (juce::Graphics& g)
         const auto& total = channelDb[0];
         const size_t idx = (size_t) juce::jlimit (0, (int) total.size() - 1, juce::roundToInt (hoverPos.x / w * (float) (total.size() - 1)));
         juce::String text = params::formatFrequency ((float) f);
-        if (post.active) text << "  " << juce::String (gridDbAt (post, f), 1) << " dBFS";
+        if (mainSpectrum().active) text << "  " << juce::String (gridDbAt (mainSpectrum(), f), 1) << (frozen ? " dBFS (ghost)" : " dBFS");
         if (! total.empty()) text << "  EQ " << params::formatDb (total[idx]);
         g.setFont (theme::mono (11.0f));
         const float tw = (float) juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), text) + 16.0f;
@@ -852,6 +906,11 @@ void EqDisplay::paint (juce::Graphics& g)
         legend (theme::muted, "Thin line: live dynamics", false);
     if (! selRangeDb.empty()) legend (theme::amber.withAlpha (0.6f), "Dynamic range", true);
     if (side.active && proc.sidechainConnected()) legend (theme::amber.withAlpha (0.5f), "Sidechain", false);
+    if (frozen)
+    {
+        legend (theme::muted, "Frozen input", false);
+        legend (theme::specHigh, "Ghost: frozen input + EQ", true);
+    }
 
     if (std::none_of (channelUsed.begin(), channelUsed.end(), [] (bool u) { return u; }))
     {
@@ -941,7 +1000,7 @@ void EqDisplay::mouseMove (const juce::MouseEvent& e)
     hoverPos = e.position;
     hoverAudition = auditionButtonAt (e.position);
     hoverNode = hoverAudition >= 0 ? -1 : nodeAt (e.position);
-    grabCandidate = hoverNode < 0 && hoverAudition < 0 && findPeakNear (e.position, grabFreq, grabDb);
+    grabCandidate = spectrumGrabOn && ! frozen && hoverNode < 0 && hoverAudition < 0 && findPeakNear (e.position, grabFreq, grabDb);
     setMouseCursor (hoverNode >= 0 || hoverAudition >= 0 || grabCandidate ? juce::MouseCursor::PointingHandCursor
                                                                          : juce::MouseCursor::CrosshairCursor);
     repaint();
@@ -991,7 +1050,7 @@ void EqDisplay::mouseDown (const juce::MouseEvent& e)
     if (e.mods.isPopupMenu()) return;
 
     double f, db;
-    if (findPeakNear (e.position, f, db))
+    if (spectrumGrabOn && ! frozen && findPeakNear (e.position, f, db))
     {
         // Spectrum Grab: a narrow bell on the peak, then keep dragging it
         const int b = proc.addBand (meq::FilterType::Bell, (float) f, 0.0f, 6.0f);

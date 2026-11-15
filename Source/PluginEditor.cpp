@@ -13,6 +13,8 @@ MeridianEditor::MeridianEditor (MeridianProcessor& p)
     globalPanel.rendererName = [this] { return glContext.isAttached() ? juce::String ("OpenGL") : juce::String ("CPU renderer"); };
 
     header.onSettings = [this] { settingsPanel.isOpen() ? settingsPanel.close() : settingsPanel.open(); };
+    settingsPanel.onSaveDefaults = [this] { proc.presets.saveAsDefault(); settings->saveAsDefaults(); };
+    settingsPanel.onResetDefaults = [this] { proc.presets.clearDefault(); settings->resetToFactory(); };
     header.onUndo = [this] { undo(); };
     header.onRedo = [this] { redo(); };
     header.onBackgroundClick = [this] { selectBand (-1); };
@@ -65,6 +67,7 @@ void MeridianEditor::applySettings()
     display.setSpectrumStyle (s.spectrumStyle);
     display.setParticleLook (s.particleDot, s.particleSpacing);
     display.setFrameRate (s.refreshHz);
+    display.setSpectrumGrab (s.spectrumGrab);
     display.setDbRange (s.dbRange);
     if (s.refreshHz != appliedRefresh) { startTimerHz (juce::jlimit (15, 144, s.refreshHz)); appliedRefresh = s.refreshHz; }
     setGpuRendering (s.gpu);

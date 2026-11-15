@@ -34,6 +34,13 @@ public:
     void setSpectrumStyle (int style)   { spectrumStyle = style; repaint(); }
     void setParticleLook (float dotSize, int spacing);
     void setFrameRate (int hz)          { frameRate = juce::jmax (15, hz); }
+    void setSpectrumGrab (bool b)       { spectrumGrabOn = b; if (! b) grabCandidate = false; }
+
+    /** Freeze: holds the input spectrum (averaged over the last half second) and
+        shows it with the current EQ applied as a "ghost" spectrum, so you can EQ
+        the frozen sound and see the result. */
+    void setFrozen (bool shouldFreeze);
+    bool isFrozen() const { return frozen; }
     void setDbRange (float r)           { dbRange = r; repaint(); }
     float getDbRange() const            { return dbRange; }
 
@@ -56,6 +63,7 @@ private:
         std::vector<float> ring;  // last N samples
         std::vector<float> db;    // raw bins (for peak finding)
         std::vector<float> grid;  // 1/6-octave smoothed, log-spaced, time-smoothed (for drawing)
+        std::vector<float> avg;   // the same, averaged over about half a second (for Freeze)
         int write = 0;
         bool active = false;
         int silentFrames = 0;
@@ -105,6 +113,12 @@ private:
     std::vector<float> fftData, scratch, power;
     std::array<double, kGridPoints> gridFreqs {};
     Spectrum pre, post, side;
+    Spectrum frozenInput, ghost;   // Freeze: held input, and held input + current EQ
+    bool frozen = false, spectrumGrabOn = false;
+    juce::TextButton freezeButton { "Freeze" };
+    std::vector<float> weightedDb; // all bands on one curve (stereo/mid full, L/R half, side quarter), for the ghost
+    const Spectrum& mainSpectrum() const { return frozen ? ghost : post; }
+    void updateGhost();
     float brightness = 1.0f;
 
     // particle style

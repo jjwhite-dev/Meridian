@@ -28,7 +28,15 @@ public:
     bool load (const Entry&);
     bool loadFile (const juce::File&);
     bool save (const juce::File&);
+    bool writeState (const juce::File&) const;
     void loadInit();
+
+    /** The EQ a new instance starts with ("Save as default"). */
+    static juce::File defaultFile();
+    bool saveAsDefault();
+    void clearDefault();
+    /** Loads the saved default if there is one, else Init. Called when the plugin is created. */
+    void loadStartupDefault();
 
     /** Steps through list() (wraps around). */
     void step (int delta);

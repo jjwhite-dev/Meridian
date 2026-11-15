@@ -67,16 +67,47 @@ bool PresetManager::loadFile (const juce::File& file)
     return true;
 }
 
-bool PresetManager::save (const juce::File& target)
+bool PresetManager::writeState (const juce::File& file) const
 {
-    auto file = target.withFileExtension (extension);
     juce::XmlElement root ("MeridianEQPreset");
     root.setAttribute ("version", 1);
     if (auto stateXml = proc.apvts.copyState().createXml())
         root.addChildElement (stateXml.release());
-    if (! root.writeTo (file)) return false;
+    file.getParentDirectory().createDirectory();
+    return root.writeTo (file);
+}
+
+bool PresetManager::save (const juce::File& target)
+{
+    auto file = target.withFileExtension (extension);
+    if (! writeState (file)) return false;
     current = { file.getFileNameWithoutExtension(), false, -1, file };
     return true;
+}
+
+juce::File PresetManager::defaultFile()
+{
+    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+               .getChildFile ("Meridian EQ").getChildFile (juce::String ("Default") + extension);
+}
+
+bool PresetManager::saveAsDefault()
+{
+    return writeState (defaultFile());
+}
+
+void PresetManager::clearDefault()
+{
+    defaultFile().deleteFile();
+}
+
+void PresetManager::loadStartupDefault()
+{
+    const auto f = defaultFile();
+    if (f.existsAsFile() && loadFile (f))
+        current = { "Default", false, -1, {} };
+    else
+        current = { "Init", true, 0, {} };
 }
 
 void PresetManager::scheduleUndoClear()

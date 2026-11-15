@@ -9,18 +9,44 @@ GlobalSettings::GlobalSettings()
     o.osxLibrarySubFolder = "Application Support";
     file = std::make_unique<juce::PropertiesFile> (o);
 
-    refreshHz     = juce::jlimit (15, 144, file->getIntValue ("refreshHz", 60));
-    fftOrder      = juce::jlimit (11, 14, file->getIntValue ("fftOrder", 13));
-    brightness    = (float) file->getDoubleValue ("brightness", 1.0);
-    spectrumStyle = juce::jlimit (0, 1, file->getIntValue ("spectrumStyle", 0));
-    particleDot   = juce::jlimit (1.0f, 6.0f, (float) file->getDoubleValue ("particleDot", 2.4));
-    particleSpacing = juce::jlimit (3, 14, file->getIntValue ("particleSpacing", 6));
-    dbRange       = (float) file->getDoubleValue ("dbRange", 18.0);
-    gpu           = file->getBoolValue ("gpu", true);
-    uiScale       = juce::jlimit (0.5f, 3.0f, (float) file->getDoubleValue ("uiScale", 1.0));
-    logicalWidth  = file->getIntValue ("logicalWidth", 1240);
-    logicalHeight = file->getIntValue ("logicalHeight", 800);
-    paletteIndex  = file->getIntValue ("palette", 0);
+    setFactory();
+    loadFrom (*file);
+    theme::apply (palette);
+}
+
+void GlobalSettings::setFactory()
+{
+    refreshHz = 60;
+    fftOrder = 13;
+    brightness = 1.0f;
+    spectrumStyle = 0;
+    particleDot = 2.4f;
+    particleSpacing = 6;
+    spectrumGrab = false;
+    dbRange = 18.0f;
+    gpu = true;
+    uiScale = 1.0f;
+    logicalWidth = 1240;
+    logicalHeight = 800;
+    paletteIndex = 0;
+    palette = theme::presets().front();
+}
+
+void GlobalSettings::loadFrom (juce::PropertiesFile& f)
+{
+    refreshHz       = juce::jlimit (15, 144, f.getIntValue ("refreshHz", refreshHz));
+    fftOrder        = juce::jlimit (11, 14, f.getIntValue ("fftOrder", fftOrder));
+    brightness      = (float) f.getDoubleValue ("brightness", brightness);
+    spectrumStyle   = juce::jlimit (0, 1, f.getIntValue ("spectrumStyle", spectrumStyle));
+    particleDot     = juce::jlimit (1.0f, 6.0f, (float) f.getDoubleValue ("particleDot", particleDot));
+    particleSpacing = juce::jlimit (3, 14, f.getIntValue ("particleSpacing", particleSpacing));
+    spectrumGrab    = f.getBoolValue ("spectrumGrab", spectrumGrab);
+    dbRange         = (float) f.getDoubleValue ("dbRange", dbRange);
+    gpu             = f.getBoolValue ("gpu", gpu);
+    uiScale         = juce::jlimit (0.5f, 3.0f, (float) f.getDoubleValue ("uiScale", uiScale));
+    logicalWidth    = f.getIntValue ("logicalWidth", logicalWidth);
+    logicalHeight   = f.getIntValue ("logicalHeight", logicalHeight);
+    paletteIndex    = f.getIntValue ("palette", paletteIndex);
 
     const auto& presets = theme::presets();
     palette = presets[(size_t) juce::jlimit (0, (int) presets.size() - 1, juce::jmax (0, paletteIndex))];
@@ -30,27 +56,23 @@ GlobalSettings::GlobalSettings()
         for (const auto& s : theme::slots())
         {
             const auto key = juce::String ("colour_") + s.key;
-            if (file->containsKey (key))
-                palette.*(s.member) = juce::Colour::fromString (file->getValue (key));
+            if (f.containsKey (key))
+                palette.*(s.member) = juce::Colour::fromString (f.getValue (key));
         }
-        palette.specFill = (float) file->getDoubleValue ("specFill", palette.specFill);
+        palette.specFill = (float) f.getDoubleValue ("specFill", palette.specFill);
     }
-    theme::apply (palette);
 }
 
-GlobalSettings::~GlobalSettings()
+void GlobalSettings::saveAsDefaults()
 {
-    save();
-}
-
-void GlobalSettings::save()
-{
+    file->clear();
     file->setValue ("refreshHz", refreshHz);
     file->setValue ("fftOrder", fftOrder);
     file->setValue ("brightness", brightness);
     file->setValue ("spectrumStyle", spectrumStyle);
     file->setValue ("particleDot", particleDot);
     file->setValue ("particleSpacing", particleSpacing);
+    file->setValue ("spectrumGrab", spectrumGrab);
     file->setValue ("dbRange", dbRange);
     file->setValue ("gpu", gpu);
     file->setValue ("uiScale", uiScale);
@@ -63,9 +85,16 @@ void GlobalSettings::save()
     file->saveIfNeeded();
 }
 
+void GlobalSettings::resetToFactory()
+{
+    file->clear();
+    file->saveIfNeeded();
+    setFactory();
+    changed();
+}
+
 void GlobalSettings::changed()
 {
     theme::apply (palette);
-    save();
     sendChangeMessage();
 }
