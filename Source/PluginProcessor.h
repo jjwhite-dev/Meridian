@@ -9,11 +9,11 @@
 #include "ui/GlobalSettings.h"
 #include "dsp/EqEngine.h"
 
-class MeridianProcessor : public juce::AudioProcessor
+class QTipProcessor : public juce::AudioProcessor
 {
 public:
-    MeridianProcessor();
-    ~MeridianProcessor() override = default;
+    QTipProcessor();
+    ~QTipProcessor() override = default;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
@@ -26,7 +26,7 @@ public:
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
 
-    const juce::String getName() const override { return "Meridian EQ"; }
+    const juce::String getName() const override { return "Q-TIP"; }
     bool acceptsMidi() const override { return false; }
     bool producesMidi() const override { return false; }
     double getTailLengthSeconds() const override { return 0.5; }
@@ -58,12 +58,12 @@ public:
     void setBandValue (int band, const char* suffix, float value);
 
     /** Turns on the first free band with the given settings. Returns its index or -1. */
-    int addBand (meq::FilterType type, float freq, float gain, float q);
+    int addBand (qtip::FilterType type, float freq, float gain, float q);
     void removeBand (int band);
     void resetBandToDefaults (int band);
 
     /** A snapshot of one band's settings for drawing. */
-    meq::BandParams readBand (int band) const;
+    qtip::BandParams readBand (int band) const;
 
     float liveGainDb (int band) const   { return engine.liveGainDb (band); }
     float liveDynDb (int band) const    { return engine.liveDynDb (band); }
@@ -71,7 +71,7 @@ public:
     double engineSampleRate() const     { return engineRate.load(); }
     double baseSampleRate() const       { return baseRate.load(); }
     bool sidechainConnected() const     { return sidechainLive.load(); }
-    meq::Transform currentTransform() const;
+    qtip::Transform currentTransform() const;
 
 private:
     struct BandPtrs
@@ -83,8 +83,8 @@ private:
     void pullParams();
     void updateLatency();
 
-    meq::Engine engine;
-    std::array<BandPtrs, meq::kNumBands> bandPtrs;
+    qtip::Engine engine;
+    std::array<BandPtrs, qtip::kNumBands> bandPtrs;
     std::atomic<float>* pPhase = nullptr;
     std::atomic<float>* pOs = nullptr;
     std::atomic<float>* pGainScale = nullptr;
@@ -94,7 +94,7 @@ private:
     std::atomic<float>* pMonitor = nullptr;
     std::atomic<float>* pLookahead = nullptr;
 
-    std::array<meq::BandParams, meq::kNumBands> bandScratch {};
+    std::array<qtip::BandParams, qtip::kNumBands> bandScratch {};
 
     juce::dsp::Oversampling<double> osMain { 2, 1, juce::dsp::Oversampling<double>::filterHalfBandPolyphaseIIR, true, false };
     juce::dsp::Oversampling<double> osSide { 2, 1, juce::dsp::Oversampling<double>::filterHalfBandPolyphaseIIR, true, false };
@@ -105,5 +105,5 @@ private:
     std::atomic<double> baseRate { 48000.0 }, engineRate { 48000.0 };
     std::atomic<bool> sidechainLive { false };
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MeridianProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (QTipProcessor)
 };

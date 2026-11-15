@@ -7,14 +7,14 @@ namespace
                     kThr, kRange, kRatio, kAttack, kRelease, kOnset, kBody, kDetect, kDetFreq, kDetQ };
 }
 
-MeridianProcessor::MeridianProcessor()
+QTipProcessor::QTipProcessor()
     : AudioProcessor (BusesProperties()
                           .withInput ("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                           .withInput ("Sidechain", juce::AudioChannelSet::stereo(), false)),
-      apvts (*this, &undoManager, "MeridianEQ", params::createLayout())
+      apvts (*this, &undoManager, "QTip", params::createLayout())
 {
-    for (int b = 0; b < meq::kNumBands; ++b)
+    for (int b = 0; b < qtip::kNumBands; ++b)
         for (size_t s = 0; s < std::size (params::band::all); ++s)
             bandPtrs[(size_t) b].p[s] = apvts.getRawParameterValue (params::bandId (b, params::band::all[s]));
 
@@ -32,7 +32,7 @@ MeridianProcessor::MeridianProcessor()
     undoManager.clearUndoHistory();
 }
 
-bool MeridianProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+bool QTipProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
     const auto in = layouts.getMainInputChannelSet();
     const auto out = layouts.getMainOutputChannelSet();
@@ -48,7 +48,7 @@ bool MeridianProcessor::isBusesLayoutSupported (const BusesLayout& layouts) cons
     return true;
 }
 
-void MeridianProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
+void QTipProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     baseRate = sampleRate;
     const int maxBlock = juce::jmax (1, samplesPerBlock);
@@ -67,28 +67,28 @@ void MeridianProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     updateLatency();
 }
 
-meq::Transform MeridianProcessor::currentTransform() const
+qtip::Transform QTipProcessor::currentTransform() const
 {
     // Linear and Mixed are not implemented yet in this prototype: they run as Analog.
-    return juce::roundToInt (pPhase->load()) == 0 ? meq::Transform::Bilinear : meq::Transform::Matched;
+    return juce::roundToInt (pPhase->load()) == 0 ? qtip::Transform::Bilinear : qtip::Transform::Matched;
 }
 
-void MeridianProcessor::pullParams()
+void QTipProcessor::pullParams()
 {
-    for (int b = 0; b < meq::kNumBands; ++b)
+    for (int b = 0; b < qtip::kNumBands; ++b)
     {
         const auto& p = bandPtrs[(size_t) b].p;
         auto& d = bandScratch[(size_t) b];
         d.enabled   = p[kOn]->load() > 0.5f;
-        d.type      = (meq::FilterType) juce::jlimit (0, (int) meq::FilterType::Count - 1, juce::roundToInt (p[kType]->load()));
+        d.type      = (qtip::FilterType) juce::jlimit (0, (int) qtip::FilterType::Count - 1, juce::roundToInt (p[kType]->load()));
         d.freq      = p[kFreq]->load();
         d.gain      = p[kGain]->load();
         d.q         = p[kQ]->load();
         d.slope     = 6 * (1 + juce::roundToInt (p[kSlope]->load()));
-        d.channel   = (meq::Channel) juce::jlimit (0, 4, juce::roundToInt (p[kChannel]->load()));
+        d.channel   = (qtip::Channel) juce::jlimit (0, 4, juce::roundToInt (p[kChannel]->load()));
         d.bypass    = p[kBypass]->load() > 0.5f;
         d.dynOn     = p[kDyn]->load() > 0.5f;
-        d.dynMode   = (meq::DynMode) juce::jlimit (0, 2, juce::roundToInt (p[kDynMode]->load()));
+        d.dynMode   = (qtip::DynMode) juce::jlimit (0, 2, juce::roundToInt (p[kDynMode]->load()));
         d.threshold = p[kThr]->load();
         d.range     = p[kRange]->load();
         d.ratio     = p[kRatio]->load();
@@ -96,24 +96,24 @@ void MeridianProcessor::pullParams()
         d.releaseMs = p[kRelease]->load();
         d.onset     = p[kOnset]->load();
         d.body      = p[kBody]->load();
-        d.detect    = (meq::Detect) juce::jlimit (0, 2, juce::roundToInt (p[kDetect]->load()));
+        d.detect    = (qtip::Detect) juce::jlimit (0, 2, juce::roundToInt (p[kDetect]->load()));
         d.detFreq   = p[kDetFreq]->load();
         d.detQ      = p[kDetQ]->load();
     }
 
-    meq::GlobalParams g;
+    qtip::GlobalParams g;
     g.transform   = currentTransform();
     g.gainScale   = pGainScale->load() / 100.0;
     g.outputDb    = pOut->load();
     g.width       = pWidth->load() / 100.0;
     g.autoGain    = pAutoGain->load() > 0.5f;
-    g.monitor     = (meq::Monitor) juce::jlimit (0, 2, juce::roundToInt (pMonitor->load()));
+    g.monitor     = (qtip::Monitor) juce::jlimit (0, 2, juce::roundToInt (pMonitor->load()));
     g.lookaheadMs = pLookahead->load();
     g.solo        = auditionBand.load();
     engine.setParams (bandScratch, g);
 }
 
-void MeridianProcessor::updateLatency()
+void QTipProcessor::updateLatency()
 {
     const int engineLatency = engine.latencySamples();
     const int latency = osActive ? (int) std::lround (engineLatency / 2.0 + osMain.getLatencyInSamples())
@@ -125,11 +125,11 @@ void MeridianProcessor::updateLatency()
     }
 }
 
-void MeridianProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)  { processT (buffer); }
-void MeridianProcessor::processBlock (juce::AudioBuffer<double>& buffer, juce::MidiBuffer&) { processT (buffer); }
+void QTipProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)  { processT (buffer); }
+void QTipProcessor::processBlock (juce::AudioBuffer<double>& buffer, juce::MidiBuffer&) { processT (buffer); }
 
 template <typename T>
-void MeridianProcessor::processT (juce::AudioBuffer<T>& buffer)
+void QTipProcessor::processT (juce::AudioBuffer<T>& buffer)
 {
     juce::ScopedNoDenormals noDenormals;
     const int n = buffer.getNumSamples();
@@ -233,18 +233,18 @@ void MeridianProcessor::processT (juce::AudioBuffer<T>& buffer)
     updateLatency();
 }
 
-juce::RangedAudioParameter* MeridianProcessor::bandParam (int band, const char* suffix) const
+juce::RangedAudioParameter* QTipProcessor::bandParam (int band, const char* suffix) const
 {
     return apvts.getParameter (params::bandId (band, suffix));
 }
 
-float MeridianProcessor::bandValue (int band, const char* suffix) const
+float QTipProcessor::bandValue (int band, const char* suffix) const
 {
     if (auto* v = apvts.getRawParameterValue (params::bandId (band, suffix))) return v->load();
     return 0.0f;
 }
 
-void MeridianProcessor::setBandValue (int band, const char* suffix, float value)
+void QTipProcessor::setBandValue (int band, const char* suffix, float value)
 {
     if (auto* p = bandParam (band, suffix))
     {
@@ -254,7 +254,7 @@ void MeridianProcessor::setBandValue (int band, const char* suffix, float value)
     }
 }
 
-void MeridianProcessor::resetBandToDefaults (int band)
+void QTipProcessor::resetBandToDefaults (int band)
 {
     for (auto* suffix : params::band::all)
         if (auto* p = bandParam (band, suffix))
@@ -265,9 +265,9 @@ void MeridianProcessor::resetBandToDefaults (int band)
         }
 }
 
-int MeridianProcessor::addBand (meq::FilterType type, float freq, float gain, float q)
+int QTipProcessor::addBand (qtip::FilterType type, float freq, float gain, float q)
 {
-    for (int b = 0; b < meq::kNumBands; ++b)
+    for (int b = 0; b < qtip::kNumBands; ++b)
     {
         if (bandValue (b, params::band::on) > 0.5f) continue;
         resetBandToDefaults (b);
@@ -282,41 +282,41 @@ int MeridianProcessor::addBand (meq::FilterType type, float freq, float gain, fl
     return -1;
 }
 
-void MeridianProcessor::removeBand (int band)
+void QTipProcessor::removeBand (int band)
 {
     if (lockedSolo == band) lockedSolo = -1;
     if (auditionBand.load() == band) auditionBand = lockedSolo;
     setBandValue (band, params::band::on, 0.0f);
 }
 
-meq::BandParams MeridianProcessor::readBand (int b) const
+qtip::BandParams QTipProcessor::readBand (int b) const
 {
-    meq::BandParams d;
+    qtip::BandParams d;
     const auto& p = bandPtrs[(size_t) b].p;
     d.enabled = p[kOn]->load() > 0.5f;
-    d.type    = (meq::FilterType) juce::jlimit (0, (int) meq::FilterType::Count - 1, juce::roundToInt (p[kType]->load()));
+    d.type    = (qtip::FilterType) juce::jlimit (0, (int) qtip::FilterType::Count - 1, juce::roundToInt (p[kType]->load()));
     d.freq    = p[kFreq]->load();
     d.gain    = p[kGain]->load();
     d.q       = p[kQ]->load();
     d.slope   = 6 * (1 + juce::roundToInt (p[kSlope]->load()));
-    d.channel = (meq::Channel) juce::jlimit (0, 4, juce::roundToInt (p[kChannel]->load()));
+    d.channel = (qtip::Channel) juce::jlimit (0, 4, juce::roundToInt (p[kChannel]->load()));
     d.bypass  = p[kBypass]->load() > 0.5f;
     d.dynOn   = p[kDyn]->load() > 0.5f;
     d.range   = p[kRange]->load();
-    d.detect  = (meq::Detect) juce::jlimit (0, 2, juce::roundToInt (p[kDetect]->load()));
+    d.detect  = (qtip::Detect) juce::jlimit (0, 2, juce::roundToInt (p[kDetect]->load()));
     d.detFreq = p[kDetFreq]->load();
     d.detQ    = p[kDetQ]->load();
     return d;
 }
 
-void MeridianProcessor::getStateInformation (juce::MemoryBlock& destData)
+void QTipProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
     state.setProperty ("preset", presets.currentName(), nullptr);
     if (auto xml = state.createXml()) copyXmlToBinary (*xml, destData);
 }
 
-void MeridianProcessor::setStateInformation (const void* data, int sizeInBytes)
+void QTipProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
         if (xml->hasTagName (apvts.state.getType()))
@@ -329,12 +329,12 @@ void MeridianProcessor::setStateInformation (const void* data, int sizeInBytes)
         }
 }
 
-juce::AudioProcessorEditor* MeridianProcessor::createEditor()
+juce::AudioProcessorEditor* QTipProcessor::createEditor()
 {
-    return new MeridianEditor (*this);
+    return new QTipEditor (*this);
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
-    return new MeridianProcessor();
+    return new QTipProcessor();
 }

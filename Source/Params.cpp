@@ -6,8 +6,8 @@ namespace params
 juce::StringArray filterTypeNames()
 {
     juce::StringArray s;
-    for (int i = 0; i < (int) meq::FilterType::Count; ++i)
-        s.add (meq::filterTypeName ((meq::FilterType) i));
+    for (int i = 0; i < (int) qtip::FilterType::Count; ++i)
+        s.add (qtip::filterTypeName ((qtip::FilterType) i));
     return s;
 }
 
@@ -67,7 +67,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
 {
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
-    for (int b = 0; b < meq::kNumBands; ++b)
+    for (int b = 0; b < qtip::kNumBands; ++b)
     {
         const juce::String n = "Band " + juce::String (b + 1) + " ";
         auto group = std::make_unique<juce::AudioProcessorParameterGroup> ("band" + juce::String (b + 1), "Band " + juce::String (b + 1), "|");

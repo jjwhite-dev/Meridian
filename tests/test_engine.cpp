@@ -5,7 +5,7 @@
 #include <memory>
 #include <vector>
 
-using namespace meq;
+using namespace qtip;
 
 static int failures = 0;
 #define CHECK(cond, ...) do { if (!(cond)) { ++failures; std::printf ("FAIL %s:%d: ", __FILE__, __LINE__); std::printf (__VA_ARGS__); std::printf ("\n"); } } while (0)

@@ -1,4 +1,4 @@
-# Meridian EQ — prototype 0.3.0
+# Q-TIP — prototype 0.4.0
 
 > **Proprietary.** Copyright (c) 2026 jjwhite-dev, all rights reserved. Using,
 > copying, modifying, building, distributing or reselling the code or the
@@ -13,22 +13,22 @@ below).
 ## Install
 
 1. Open the **Actions** tab on GitHub, pick the latest successful
-   **Build** run and download `Meridian-EQ-VST3-Windows` or
-   `Meridian-EQ-macOS`.
-2. Windows: copy `Meridian EQ.vst3` to `C:\Program Files\Common Files\VST3\`.
-   macOS: copy `Meridian EQ.vst3` to `~/Library/Audio/Plug-Ins/VST3/` and
-   `Meridian EQ.component` to `~/Library/Audio/Plug-Ins/Components/`. The
+   **Build** run and download `Q-TIP-VST3-Windows` or
+   `Q-TIP-macOS`.
+2. Windows: copy `Q-TIP.vst3` to `C:\Program Files\Common Files\VST3\`.
+   macOS: copy `Q-TIP.vst3` to `~/Library/Audio/Plug-Ins/VST3/` and
+   `Q-TIP.component` to `~/Library/Audio/Plug-Ins/Components/`. The
    builds are not signed, so run
-   `xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/*/Meridian\ EQ.*`
+   `xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/*/Q-TIP.*`
    once.
-3. Rescan plugins in your DAW. It shows up as an effect called **Meridian EQ**.
+3. Rescan plugins in your DAW. It shows up as an effect called **Q-TIP**.
 
 ## Using it
 
 - **Presets**: the preset field in the header. Arrows step through all
   presets; click the name for the list (7 factory presets plus yours), Save,
   Save as, Load from file, Show presets folder and Init. Your presets are
-  `.mepreset` files in `Documents/Meridian EQ/Presets`.
+  `.qtpreset` files in `Documents/Q-TIP/Presets`.
 - **Undo / redo**: the arrows left of the preset field, or Ctrl/Cmd+Z and
   Ctrl/Cmd+Shift+Z (Ctrl+Y). Every click starts a new step, so a whole drag
   undoes at once. Loading a preset clears the history.
@@ -52,9 +52,11 @@ below).
   Init and the factory options. Option changes apply straight away but are
   only kept for the next start when you save them as default. Sessions in
   your DAW always recall their own EQ settings.
-- **Edit**: drag a dot (left/right = frequency, up/down = gain; hold Shift to
-  change only the gain), mouse wheel over a dot for Q, double-click a dot to
-  delete it, right-click for type, channel, dynamics, bypass and solo.
+- **Edit**: drag a dot to move it (left/right = frequency, up/down = gain).
+  Hold **Shift** while dragging to move only vertically (gain), **Alt** to
+  move only horizontally (frequency). **Ctrl-drag** (Cmd-drag on macOS) up or
+  down changes Q, as does the mouse wheel over a dot. Double-click a dot to
+  delete it; right-click for type, channel, dynamics, bypass and audition.
 - **Audition**: the speaker button above a dot (shown on the selected and the
   hovered band) switches audition on and off. While it is on you hear only
   that band's range (cut bands play what they remove), everything outside the
@@ -141,17 +143,17 @@ band's detection to **Sidechain**.
 ## Building
 
 Needs CMake 3.22+ and a C++17 compiler. JUCE 8.0.10 is downloaded
-automatically (or pass `-DMERIDIAN_JUCE_DIR=/path/to/JUCE`).
+automatically (or pass `-DQTIP_JUCE_DIR=/path/to/JUCE`).
 
 ```
 cmake -S . -B build
-cmake --build build --config Release --target MeridianEQ_VST3
+cmake --build build --config Release --target QTip_VST3
 ```
 
 The DSP has unit tests that need no JUCE:
 
 ```
-cmake -S . -B build-tests -DMERIDIAN_TESTS_ONLY=ON
+cmake -S . -B build-tests -DQTIP_TESTS_ONLY=ON
 cmake --build build-tests
 ctest --test-dir build-tests --output-on-failure
 ```

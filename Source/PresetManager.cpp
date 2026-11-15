@@ -18,12 +18,12 @@ namespace
     constexpr int numFactory = (int) (sizeof (factory) / sizeof (factory[0]));
 }
 
-PresetManager::PresetManager (MeridianProcessor& p) : proc (p) {}
+PresetManager::PresetManager (QTipProcessor& p) : proc (p) {}
 
 juce::File PresetManager::folder()
 {
     auto f = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
-                 .getChildFile ("Meridian EQ").getChildFile ("Presets");
+                 .getChildFile ("Q-TIP").getChildFile ("Presets");
     f.createDirectory();
     return f;
 }
@@ -57,7 +57,7 @@ bool PresetManager::load (const Entry& e)
 bool PresetManager::loadFile (const juce::File& file)
 {
     auto xml = juce::XmlDocument::parse (file);
-    if (xml == nullptr || ! xml->hasTagName ("MeridianEQPreset")) return false;
+    if (xml == nullptr || ! xml->hasTagName ("QTipPreset")) return false;
     auto* stateXml = xml->getChildByName (proc.apvts.state.getType());
     if (stateXml == nullptr) return false;
 
@@ -69,7 +69,7 @@ bool PresetManager::loadFile (const juce::File& file)
 
 bool PresetManager::writeState (const juce::File& file) const
 {
-    juce::XmlElement root ("MeridianEQPreset");
+    juce::XmlElement root ("QTipPreset");
     root.setAttribute ("version", 1);
     if (auto stateXml = proc.apvts.copyState().createXml())
         root.addChildElement (stateXml.release());
@@ -88,7 +88,7 @@ bool PresetManager::save (const juce::File& target)
 juce::File PresetManager::defaultFile()
 {
     return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-               .getChildFile ("Meridian EQ").getChildFile (juce::String ("Default") + extension);
+               .getChildFile ("Q-TIP").getChildFile (juce::String ("Default") + extension);
 }
 
 bool PresetManager::saveAsDefault()
@@ -164,7 +164,7 @@ void PresetManager::applyFactory (int index)
     proc.lockedSolo = -1;
     proc.auditionBand = -1;
 
-    using FT = meq::FilterType;
+    using FT = qtip::FilterType;
     auto band = [this] (FT t, float f, float g, float q) { return proc.addBand (t, f, g, q); };
     auto set = [this] (int b, const char* s, float v) { if (b >= 0) proc.setBandValue (b, s, v); };
     auto dyn = [&] (int b, float thr, float range, float ratio, float att, float rel)

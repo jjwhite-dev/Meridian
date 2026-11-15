@@ -1,4 +1,4 @@
-// Meridian EQ - filter design (pure C++17, no JUCE).
+// Q-TIP - filter design (pure C++17, no JUCE).
 //
 // Every filter shape is described as a cascade of analog first/second-order
 // sections. Each analog section is turned into a digital biquad by one of two
@@ -19,7 +19,7 @@
 #include <cmath>
 #include <complex>
 
-namespace meq
+namespace qtip
 {
 
 constexpr double kPi = 3.14159265358979323846;
@@ -406,4 +406,4 @@ inline void designBand (Cascade& c, const BandDesign& d, double sampleRate, Tran
     (void) nyq;
 }
 
-} // namespace meq
+} // namespace qtip

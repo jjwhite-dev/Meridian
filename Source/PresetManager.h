@@ -2,14 +2,14 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-class MeridianProcessor;
+class QTipProcessor;
 
-/** Factory presets (built in) and user presets (.mepreset files in
-    Documents/Meridian EQ/Presets). A preset holds every parameter. */
+/** Factory presets (built in) and user presets (.qtpreset files in
+    Documents/Q-TIP/Presets). A preset holds every parameter. */
 class PresetManager
 {
 public:
-    explicit PresetManager (MeridianProcessor&);
+    explicit PresetManager (QTipProcessor&);
 
     struct Entry
     {
@@ -20,7 +20,7 @@ public:
     };
 
     static juce::File folder();
-    static constexpr const char* extension = ".mepreset";
+    static constexpr const char* extension = ".qtpreset";
 
     /** Factory presets first, then user presets sorted by name. */
     std::vector<Entry> list() const;
@@ -55,7 +55,7 @@ private:
 
     void scheduleUndoClear();
 
-    MeridianProcessor& proc;
+    QTipProcessor& proc;
     juce::uint32 clearUndoAt = 0;
     Entry current { "Init", true, 0, {} };
 };

@@ -7,10 +7,10 @@
       "amber"    (bool)  use the dynamics colour
     ToggleButton property:
       "switch"   (bool)  draw as an on/off switch instead of a pill */
-class MeridianLookAndFeel : public juce::LookAndFeel_V4
+class QTipLookAndFeel : public juce::LookAndFeel_V4
 {
 public:
-    MeridianLookAndFeel();
+    QTipLookAndFeel();
     /** Re-reads the theme colours (after the palette changed). */
     void applyTheme();
 

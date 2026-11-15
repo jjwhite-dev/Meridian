@@ -217,6 +217,10 @@ public:
         for (const auto& sl : theme::slots())
             addAndMakeVisible (rows.add (new ColourRow (settings, sl)));
 
+        // the mouse wheel scrolls the panel; it never changes a slider here
+        for (auto* sl : { &brightness.slider, &fill.slider, &dot.slider, &spacing.slider })
+            sl->setScrollWheelEnabled (false);
+
         sync();
         setSize (panelWidth - 12, 1400);
     }

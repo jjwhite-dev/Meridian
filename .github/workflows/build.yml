@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Configure (tests only, no JUCE)
-        run: cmake -S . -B build-tests -DMERIDIAN_TESTS_ONLY=ON -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build-tests -DQTIP_TESTS_ONLY=ON -DCMAKE_BUILD_TYPE=Release
       - name: Build tests
         run: cmake --build build-tests --parallel
       - name: Run tests
@@ -26,12 +26,12 @@ jobs:
         run: cmake -S . -B build -A x64
 
       - name: Build VST3
-        run: cmake --build build --config Release --target MeridianEQ_VST3 --parallel
+        run: cmake --build build --config Release --target QTip_VST3 --parallel
 
       - name: Collect the plugin
         shell: pwsh
         run: |
-          $vst = Get-ChildItem -Path build -Recurse -Directory -Filter "Meridian EQ.vst3" | Select-Object -First 1
+          $vst = Get-ChildItem -Path build -Recurse -Directory -Filter "Q-TIP.vst3" | Select-Object -First 1
           if (-not $vst) { throw "VST3 bundle not found" }
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item -Recurse -Path $vst.FullName -Destination dist
@@ -39,7 +39,7 @@ jobs:
 
       - uses: actions/upload-artifact@v5
         with:
-          name: Meridian-EQ-VST3-Windows
+          name: Q-TIP-VST3-Windows
           path: dist
 
   macos:
@@ -51,18 +51,18 @@ jobs:
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
 
       - name: Build VST3 and AU
-        run: cmake --build build --config Release --target MeridianEQ_VST3 MeridianEQ_AU --parallel
+        run: cmake --build build --config Release --target QTip_VST3 QTip_AU --parallel
 
       - name: Collect the plugins
         run: |
           mkdir -p dist
-          vst=$(find build -type d -name "Meridian EQ.vst3" | head -n 1)
-          au=$(find build -type d -name "Meridian EQ.component" | head -n 1)
+          vst=$(find build -type d -name "Q-TIP.vst3" | head -n 1)
+          au=$(find build -type d -name "Q-TIP.component" | head -n 1)
           test -n "$vst" && test -n "$au"
           cp -R "$vst" "$au" dist/
           cp README.md dist/
 
       - uses: actions/upload-artifact@v5
         with:
-          name: Meridian-EQ-macOS
+          name: Q-TIP-macOS
           path: dist

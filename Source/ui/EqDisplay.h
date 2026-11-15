@@ -5,7 +5,7 @@
 
 #include "../dsp/EqEngine.h"
 
-class MeridianProcessor;
+class QTipProcessor;
 class AnalyzerFifo;
 
 /** The big curve + analyzer view. Bands are dots: drag to move (frequency /
@@ -16,7 +16,7 @@ class AnalyzerFifo;
 class EqDisplay : public juce::Component
 {
 public:
-    explicit EqDisplay (MeridianProcessor&);
+    explicit EqDisplay (QTipProcessor&);
 
     /** Pull new analyzer data, rebuild curves and repaint. Called by the editor's timer. */
     void refresh();
@@ -99,12 +99,12 @@ private:
     bool showsAuditionButton (int band) const;
     void toggleAudition (int band);
     bool findPeakNear (juce::Point<float> p, double& freq, double& db) const;
-    void beginDrag (int band);
+    void beginDrag (int band, bool adjustQ = false);
     void endDrag();
     void showBandMenu (int band);
     void setParam (int band, const char* suffix, float value);
 
-    MeridianProcessor& proc;
+    QTipProcessor& proc;
 
     // analyzer
     int fftOrder = 12;
@@ -145,9 +145,9 @@ private:
     // curves
     double rate = 48000.0;
     double gainScale = 1.0;
-    std::array<meq::BandParams, meq::kNumBands> bands {};
-    std::array<meq::Cascade, meq::kNumBands> cascades {};
-    std::array<std::vector<float>, meq::kNumBands> bandDb;     // each band on its own
+    std::array<qtip::BandParams, qtip::kNumBands> bands {};
+    std::array<qtip::Cascade, qtip::kNumBands> cascades {};
+    std::array<std::vector<float>, qtip::kNumBands> bandDb;     // each band on its own
     std::array<std::vector<float>, 5> channelDb, channelLiveDb; // per processing channel (stereo bands included)
     std::array<bool, 5> channelUsed {}, channelDynamic {};
     std::vector<double> pointFreqs;
@@ -156,6 +156,8 @@ private:
     // view / interaction
     float dbRange = 18.0f;
     int selected = -1, hoverNode = -1, hoverAudition = -1, dragBand = -1;
+    bool dragQ = false;            // Ctrl/Cmd-drag: vertical movement changes Q
+    float dragStartQ = 1.0f, dragStartY = 0.0f;
     bool hovering = false;
     juce::Point<float> hoverPos;
     bool grabCandidate = false;

@@ -3,9 +3,9 @@
 GlobalSettings::GlobalSettings()
 {
     juce::PropertiesFile::Options o;
-    o.applicationName = "Meridian EQ";
+    o.applicationName = "Q-TIP";
     o.filenameSuffix = ".settings";
-    o.folderName = "Meridian EQ";
+    o.folderName = "Q-TIP";
     o.osxLibrarySubFolder = "Application Support";
     file = std::make_unique<juce::PropertiesFile> (o);
 

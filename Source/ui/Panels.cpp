@@ -13,7 +13,7 @@ void PanelBase::paintPanel (juce::Graphics& g)
 }
 
 // ================================================================== PresetBar
-PresetBar::PresetBar (MeridianProcessor& p) : proc (p)
+PresetBar::PresetBar (QTipProcessor& p) : proc (p)
 {
     prev.onClick = [this] { proc.presets.step (-1); repaint(); };
     next.onClick = [this] { proc.presets.step (1); repaint(); };
@@ -139,7 +139,7 @@ void PresetBar::loadFromFile()
 }
 
 // ================================================================== HeaderBar
-HeaderBar::HeaderBar (MeridianProcessor& p) : proc (p), presetBar (p)
+HeaderBar::HeaderBar (QTipProcessor& p) : proc (p), presetBar (p)
 {
     undo.onClick = [this] { if (onUndo) onUndo(); };
     redo.onClick = [this] { if (onRedo) onRedo(); };
@@ -186,7 +186,7 @@ void HeaderBar::paint (juce::Graphics& g)
     g.strokePath (logo, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     g.setColour (theme::text);
     g.setFont (theme::font (15.0f, true));
-    g.drawText ("Meridian EQ", 46, 0, 120, getHeight(), juce::Justification::centredLeft);
+    g.drawText ("Q-TIP", 46, 0, 120, getHeight(), juce::Justification::centredLeft);
 
     theme::caption (g, "Phase", phase.getBounds().translated (-56, 0).withWidth (50), juce::Justification::centredRight);
 }
@@ -210,13 +210,13 @@ void HeaderBar::resized()
 }
 
 // ================================================================== BandStrip
-BandStrip::BandStrip (MeridianProcessor& p) : proc (p) {}
+BandStrip::BandStrip (QTipProcessor& p) : proc (p) {}
 
 void BandStrip::refresh()
 {
     juce::uint64 h = 1469598103934665603ull;
     auto mix = [&h] (juce::uint64 v) { h = (h ^ v) * 1099511628211ull; };
-    for (int b = 0; b < meq::kNumBands; ++b)
+    for (int b = 0; b < qtip::kNumBands; ++b)
     {
         const auto d = proc.readBand (b);
         mix (d.enabled ? 1u : 0u);
@@ -228,10 +228,10 @@ void BandStrip::refresh()
     if (h != shownKey) { shownKey = h; repaint(); }
 }
 
-juce::String BandStrip::chipLabel (int b, const meq::BandParams& d)
+juce::String BandStrip::chipLabel (int b, const qtip::BandParams& d)
 {
-    juce::String label = juce::String (b + 1) + "   " + meq::filterTypeShort (d.type);
-    if (d.channel != meq::Channel::Stereo) label << " " << params::channels[(int) d.channel];
+    juce::String label = juce::String (b + 1) + "   " + qtip::filterTypeShort (d.type);
+    if (d.channel != qtip::Channel::Stereo) label << " " << params::channels[(int) d.channel];
     return label;
 }
 
@@ -240,7 +240,7 @@ std::vector<BandStrip::Chip> BandStrip::layoutChips() const
     std::vector<Chip> chips;
     float x = 120.0f;
     const auto f = theme::font (11.0f, true);
-    for (int b = 0; b < meq::kNumBands; ++b)
+    for (int b = 0; b < qtip::kNumBands; ++b)
     {
         const auto d = proc.readBand (b);
         if (! d.enabled) continue;
@@ -264,7 +264,7 @@ void BandStrip::paint (juce::Graphics& g)
     g.fillRect (0, getHeight() - 1, getWidth(), 1);
 
     int count = 0;
-    for (int b = 0; b < meq::kNumBands; ++b) count += proc.bandValue (b, pb::on) > 0.5f ? 1 : 0;
+    for (int b = 0; b < qtip::kNumBands; ++b) count += proc.bandValue (b, pb::on) > 0.5f ? 1 : 0;
     theme::caption (g, "Bands " + juce::String (count) + " / 32", { 16, 0, 100, getHeight() });
 
     const auto chips = layoutChips();
@@ -288,8 +288,8 @@ void BandStrip::paint (juce::Graphics& g)
         inner.removeFromLeft (5);
         filtericons::draw (g, d.type, inner.removeFromLeft (22).reduced (0, 9), on ? theme::on (col) : col, 1.3f);
         inner.removeFromLeft (6);
-        juce::String rest = meq::filterTypeShort (d.type);
-        if (d.channel != meq::Channel::Stereo) rest << " " << params::channels[(int) d.channel];
+        juce::String rest = qtip::filterTypeShort (d.type);
+        if (d.channel != qtip::Channel::Stereo) rest << " " << params::channels[(int) d.channel];
         g.setColour (textCol);
         g.drawText (rest, inner.withTrimmedRight (d.dynOn ? 9 : 0), juce::Justification::centredLeft);
         if (d.dynOn)
@@ -312,7 +312,7 @@ void BandStrip::paint (juce::Graphics& g)
 
     g.setColour (theme::muted);
     g.setFont (theme::font (11.0f));
-    g.drawText ("Speaker above a dot: audition  /  drag to move  /  wheel for Q", getLocalBounds().withTrimmedRight (16),
+    g.drawText ("Drag: move  /  Shift: gain only  /  Alt: frequency only  /  Ctrl-drag or wheel: Q  /  speaker: audition", getLocalBounds().withTrimmedRight (16),
                 juce::Justification::centredRight);
 }
 
@@ -323,7 +323,7 @@ void BandStrip::mouseDown (const juce::MouseEvent& e)
         if (c.r.contains (e.position)) { if (onSelect) onSelect (c.band); return; }
     if (addButtonArea (chips).contains (e.position))
     {
-        const int b = proc.addBand (meq::FilterType::Bell, 1000.0f, 0.0f, 1.0f);
+        const int b = proc.addBand (qtip::FilterType::Bell, 1000.0f, 0.0f, 1.0f);
         if (b >= 0 && onSelect) onSelect (b);
         return;
     }
@@ -331,7 +331,7 @@ void BandStrip::mouseDown (const juce::MouseEvent& e)
 }
 
 // ================================================================== BandPanel
-BandPanel::BandPanel (MeridianProcessor& p) : proc (p)
+BandPanel::BandPanel (QTipProcessor& p) : proc (p)
 {
     addAndMakeVisible (type);
     for (auto* k : { &freq, &gain, &q, &slope }) addAndMakeVisible (*k);
@@ -390,9 +390,9 @@ void BandPanel::update()
                                     theme::channelColour (3), theme::channelColour (4) });
     }
     if (band < 0) return;
-    const auto t = (meq::FilterType) juce::roundToInt (proc.bandValue (band, pb::type));
-    gain.setEnabled (meq::typeUsesGain (t));
-    slope.setEnabled (meq::typeUsesSlope (t));
+    const auto t = (qtip::FilterType) juce::roundToInt (proc.bandValue (band, pb::type));
+    gain.setEnabled (qtip::typeUsesGain (t));
+    slope.setEnabled (qtip::typeUsesSlope (t));
     solo.setToggleState (proc.lockedSolo == band, juce::dontSendNotification);
     type.setColour (theme::channelColour (juce::roundToInt (proc.bandValue (band, pb::channel))));
 }
@@ -436,7 +436,7 @@ void BandPanel::resized()
 }
 
 // ================================================================== DynamicsPanel
-DynamicsPanel::DynamicsPanel (MeridianProcessor& p) : proc (p)
+DynamicsPanel::DynamicsPanel (QTipProcessor& p) : proc (p)
 {
     enable.getProperties().set ("switch", true);
     enable.getProperties().set ("amber", true);
@@ -479,18 +479,18 @@ void DynamicsPanel::update()
     juce::String newNote;
     if (band >= 0)
     {
-        const auto t = (meq::FilterType) juce::roundToInt (proc.bandValue (band, pb::type));
-        const bool usable = meq::typeUsesGain (t);
+        const auto t = (qtip::FilterType) juce::roundToInt (proc.bandValue (band, pb::type));
+        const bool usable = qtip::typeUsesGain (t);
         enable.setEnabled (usable);
         show = usable && proc.bandValue (band, pb::dyn) > 0.5f;
-        if (! usable) newNote = juce::String (meq::filterTypeName (t)) + " has no gain to move, so it has no dynamics.";
+        if (! usable) newNote = juce::String (qtip::filterTypeName (t)) + " has no gain to move, so it has no dynamics.";
         else if (! show) newNote = "Turn on to compress or expand above or below a threshold, split transient from body, "
                                    "or key the band from another frequency range or the sidechain input.";
         const int det = juce::roundToInt (proc.bandValue (band, pb::detect));
         detFreq.setEnabled (det != 0);
         detQ.setEnabled (det != 0);
         if (show && det == 2 && ! proc.sidechainConnected())
-            newNote = "No sidechain signal: route a track to Meridian EQ's sidechain input in your DAW.";
+            newNote = "No sidechain signal: route a track to Q-TIP's sidechain input in your DAW.";
     }
     else
     {
@@ -553,7 +553,7 @@ void DynamicsPanel::resized()
 }
 
 // ================================================================== GlobalPanel
-GlobalPanel::GlobalPanel (MeridianProcessor& p) : proc (p)
+GlobalPanel::GlobalPanel (QTipProcessor& p) : proc (p)
 {
     gainScale.attach (p.apvts.getParameter (params::gainScale));
     width.attach (p.apvts.getParameter (params::width));

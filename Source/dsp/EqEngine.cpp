@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace meq
+namespace qtip
 {
 
 namespace
@@ -430,4 +430,4 @@ void Engine::process (double* L, double* R, const double* scL, const double* scR
     }
 }
 
-} // namespace meq
+} // namespace qtip

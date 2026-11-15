@@ -1,12 +1,12 @@
 #include "LookAndFeel.h"
 #include "Theme.h"
 
-MeridianLookAndFeel::MeridianLookAndFeel()
+QTipLookAndFeel::QTipLookAndFeel()
 {
     applyTheme();
 }
 
-void MeridianLookAndFeel::applyTheme()
+void QTipLookAndFeel::applyTheme()
 {
     setColour (juce::ResizableWindow::backgroundColourId, theme::bg);
     setColour (juce::ComboBox::backgroundColourId, theme::well);
@@ -30,7 +30,7 @@ void MeridianLookAndFeel::applyTheme()
     setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
 }
 
-void MeridianLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w, int h, float pos,
+void QTipLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w, int h, float pos,
                                             float startAngle, float endAngle, juce::Slider& s)
 {
     const auto bounds = juce::Rectangle<int> (x, y, w, h).toFloat();
@@ -66,7 +66,7 @@ void MeridianLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int
     g.drawLine ({ c + dir * (rCap * 0.3f), c + dir * (rCap * 0.85f) }, 2.0f);
 }
 
-void MeridianLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int w, int h, float pos, float, float,
+void QTipLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int w, int h, float pos, float, float,
                                             juce::Slider::SliderStyle style, juce::Slider& s)
 {
     if (style != juce::Slider::LinearHorizontal)
@@ -95,7 +95,7 @@ void MeridianLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int
     g.fillEllipse (pos - 6.0f, r.getCentreY() - 6.0f, 12.0f, 12.0f);
 }
 
-void MeridianLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b, bool highlighted, bool)
+void QTipLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b, bool highlighted, bool)
 {
     const auto r = b.getLocalBounds().toFloat();
     const bool on = b.getToggleState();
@@ -129,7 +129,7 @@ void MeridianLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButto
     g.drawText (b.getButtonText(), r.withTrimmedLeft (26.0f).withTrimmedRight (8.0f), juce::Justification::centredLeft);
 }
 
-void MeridianLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& b, const juce::Colour&, bool highlighted, bool down)
+void QTipLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& b, const juce::Colour&, bool highlighted, bool down)
 {
     const auto r = b.getLocalBounds().toFloat().reduced (0.5f);
     const bool on = b.getToggleState();
@@ -139,16 +139,16 @@ void MeridianLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button&
     g.drawRoundedRectangle (r, 7.0f, 1.0f);
 }
 
-void MeridianLookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& b, bool, bool)
+void QTipLookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& b, bool, bool)
 {
     g.setFont (theme::font (12.0f, true));
     g.setColour (b.getToggleState() ? theme::onAccent : (b.isEnabled() ? theme::textDim : theme::faint));
     g.drawText (b.getButtonText(), b.getLocalBounds(), juce::Justification::centred);
 }
 
-juce::Font MeridianLookAndFeel::getTextButtonFont (juce::TextButton&, int) { return theme::font (12.0f, true); }
+juce::Font QTipLookAndFeel::getTextButtonFont (juce::TextButton&, int) { return theme::font (12.0f, true); }
 
-void MeridianLookAndFeel::drawComboBox (juce::Graphics& g, int w, int h, bool, int, int, int, int, juce::ComboBox& box)
+void QTipLookAndFeel::drawComboBox (juce::Graphics& g, int w, int h, bool, int, int, int, int, juce::ComboBox& box)
 {
     const auto r = juce::Rectangle<float> (0, 0, (float) w, (float) h).reduced (0.5f);
     g.setColour (theme::well);
@@ -164,16 +164,16 @@ void MeridianLookAndFeel::drawComboBox (juce::Graphics& g, int w, int h, bool, i
     g.strokePath (arrow, juce::PathStrokeType (1.5f));
 }
 
-juce::Font MeridianLookAndFeel::getComboBoxFont (juce::ComboBox&) { return theme::font (13.0f, true); }
-juce::Font MeridianLookAndFeel::getPopupMenuFont() { return theme::font (13.0f); }
+juce::Font QTipLookAndFeel::getComboBoxFont (juce::ComboBox&) { return theme::font (13.0f, true); }
+juce::Font QTipLookAndFeel::getPopupMenuFont() { return theme::font (13.0f); }
 
-void MeridianLookAndFeel::positionComboBoxText (juce::ComboBox& box, juce::Label& label)
+void QTipLookAndFeel::positionComboBoxText (juce::ComboBox& box, juce::Label& label)
 {
     label.setBounds (8, 1, box.getWidth() - 30, box.getHeight() - 2);
     label.setFont (getComboBoxFont (box));
 }
 
-void MeridianLookAndFeel::drawPopupMenuBackground (juce::Graphics& g, int w, int h)
+void QTipLookAndFeel::drawPopupMenuBackground (juce::Graphics& g, int w, int h)
 {
     g.fillAll (theme::well);
     g.setColour (theme::border2);

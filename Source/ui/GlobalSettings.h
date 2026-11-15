@@ -4,7 +4,7 @@
 #include <juce_events/juce_events.h>
 #include "Theme.h"
 
-/** Interface options shared by every Meridian EQ instance.
+/** Interface options shared by every Q-TIP instance.
     At startup they are loaded from the saved defaults (or the factory
     defaults). Changes apply right away but are not remembered for the next
     startup unless the user chooses "Save as default".

@@ -4,7 +4,7 @@
 #include "FilterIcons.h"
 #include "../dsp/EqEngine.h"
 
-class MeridianProcessor;
+class QTipProcessor;
 
 /** Rounded panel background with a caption. */
 class PanelBase : public juce::Component
@@ -17,7 +17,7 @@ public:
 class PresetBar : public juce::Component
 {
 public:
-    explicit PresetBar (MeridianProcessor&);
+    explicit PresetBar (QTipProcessor&);
     void paint (juce::Graphics&) override;
     void resized() override;
     void mouseDown (const juce::MouseEvent&) override;
@@ -27,7 +27,7 @@ private:
     void saveAs();
     void loadFromFile();
 
-    MeridianProcessor& proc;
+    QTipProcessor& proc;
     IconButton prev { "Previous preset", icons::chevronLeft() };
     IconButton next { "Next preset", icons::chevronRight() };
     IconButton save { "Save preset", icons::save() };
@@ -38,7 +38,7 @@ private:
 class HeaderBar : public juce::Component
 {
 public:
-    explicit HeaderBar (MeridianProcessor&);
+    explicit HeaderBar (QTipProcessor&);
     void paint (juce::Graphics&) override;
     void resized() override;
     void mouseDown (const juce::MouseEvent&) override { if (onBackgroundClick) onBackgroundClick(); }
@@ -49,7 +49,7 @@ public:
     std::function<void()> onSettings, onUndo, onRedo, onBackgroundClick;
 
 private:
-    MeridianProcessor& proc;
+    QTipProcessor& proc;
     juce::String shownPreset;
     IconButton undo { "Undo (Ctrl/Cmd+Z)", icons::undo() };
     IconButton redo { "Redo (Ctrl/Cmd+Shift+Z)", icons::redo() };
@@ -63,7 +63,7 @@ private:
 class BandStrip : public juce::Component
 {
 public:
-    explicit BandStrip (MeridianProcessor&);
+    explicit BandStrip (QTipProcessor&);
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
 
@@ -77,15 +77,15 @@ private:
     struct Chip { int band; juce::Rectangle<float> r; };
     std::vector<Chip> layoutChips() const;
     juce::Rectangle<float> addButtonArea (const std::vector<Chip>&) const;
-    static juce::String chipLabel (int band, const meq::BandParams&);
+    static juce::String chipLabel (int band, const qtip::BandParams&);
 
-    MeridianProcessor& proc;
+    QTipProcessor& proc;
 };
 
 class BandPanel : public PanelBase
 {
 public:
-    explicit BandPanel (MeridianProcessor&);
+    explicit BandPanel (QTipProcessor&);
     void setBand (int band);
     void update();
     void paint (juce::Graphics&) override;
@@ -94,7 +94,7 @@ public:
     std::function<void (int)> onSelect;
 
 private:
-    MeridianProcessor& proc;
+    QTipProcessor& proc;
     int band = -1;
     int coloursVersion = -1;
     TypeSelector type;
@@ -109,14 +109,14 @@ private:
 class DynamicsPanel : public PanelBase
 {
 public:
-    explicit DynamicsPanel (MeridianProcessor&);
+    explicit DynamicsPanel (QTipProcessor&);
     void setBand (int band);
     void update();
     void paint (juce::Graphics&) override;
     void resized() override;
 
 private:
-    MeridianProcessor& proc;
+    QTipProcessor& proc;
     int band = -1;
     juce::ToggleButton enable;
     SegmentedControl mode { { "Above", "Below", "Two-way" }, true };
@@ -133,7 +133,7 @@ private:
 class GlobalPanel : public PanelBase
 {
 public:
-    explicit GlobalPanel (MeridianProcessor&);
+    explicit GlobalPanel (QTipProcessor&);
     void update();
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -144,7 +144,7 @@ public:
     std::function<void()> onBackgroundClick;
 
 private:
-    MeridianProcessor& proc;
+    QTipProcessor& proc;
     BarSlider gainScale { "Gain scale", false, true }, width { "Stereo width" }, output { "Output", false, true },
               lookahead { "Lookahead" };
     juce::ToggleButton autoGain { "Auto gain" };

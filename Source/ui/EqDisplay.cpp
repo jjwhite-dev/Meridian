@@ -40,7 +40,7 @@ namespace
     }
 }
 
-EqDisplay::EqDisplay (MeridianProcessor& p) : proc (p)
+EqDisplay::EqDisplay (QTipProcessor& p) : proc (p)
 {
     for (int i = 0; i < kGridPoints; ++i)
         gridFreqs[(size_t) i] = kMinF * std::pow (kMaxF / kMinF, (double) i / (kGridPoints - 1));
@@ -381,7 +381,7 @@ void EqDisplay::rebuildCurves()
     juce::uint64 h = 1469598103934665603ull;
     auto mix = [&h] (double v) { juce::uint64 bits; std::memcpy (&bits, &v, sizeof bits); h = (h ^ bits) * 1099511628211ull; };
     anyDynamicBand = false;
-    for (int b = 0; b < meq::kNumBands; ++b)
+    for (int b = 0; b < qtip::kNumBands; ++b)
     {
         bands[(size_t) b] = proc.readBand (b);
         const auto& p = bands[(size_t) b];
@@ -389,7 +389,7 @@ void EqDisplay::rebuildCurves()
         if (! p.enabled) continue;
         mix ((double) (int) p.type); mix (p.freq); mix (p.gain); mix (p.q); mix (p.slope);
         mix ((double) (int) p.channel); mix (p.bypass ? 1 : 0); mix (p.dynOn ? 1 : 0); mix (p.range);
-        if (p.dynOn && meq::typeUsesGain (p.type) && ! p.bypass) anyDynamicBand = true;
+        if (p.dynOn && qtip::typeUsesGain (p.type) && ! p.bypass) anyDynamicBand = true;
     }
     mix (gainScale); mix (rate); mix ((double) (int) proc.currentTransform()); mix (selected); mix ((double) pointFreqs.size());
 
@@ -409,27 +409,27 @@ void EqDisplay::computeStatic (juce::uint64 key)
     channelDynamic.fill (false);
     selRangeDb.clear();
 
-    auto evalInto = [&] (const meq::Cascade& c, std::vector<float>& out)
+    auto evalInto = [&] (const qtip::Cascade& c, std::vector<float>& out)
     {
         out.resize (np);
         for (size_t i = 0; i < np; ++i)
-            out[i] = pointFreqs[i] < 0.5 * rate ? (float) c.magnitudeDb (2.0 * meq::kPi * pointFreqs[i] / rate) : -120.0f;
+            out[i] = pointFreqs[i] < 0.5 * rate ? (float) c.magnitudeDb (2.0 * qtip::kPi * pointFreqs[i] / rate) : -120.0f;
     };
 
-    for (int b = 0; b < meq::kNumBands; ++b)
+    for (int b = 0; b < qtip::kNumBands; ++b)
     {
         const auto& p = bands[(size_t) b];
         auto& c = cascades[(size_t) b];
         auto& own = bandDb[(size_t) b];
         if (! p.enabled) { c.clear(); own.clear(); continue; }
 
-        meq::Engine::designStatic (c, p, gainScale, rate, transform);
+        qtip::Engine::designStatic (c, p, gainScale, rate, transform);
         evalInto (c, own);
 
         const int ch = (int) p.channel;
         channelUsed[(size_t) ch] = true;
         if (p.bypass || c.isAllpassOnly) continue;
-        const bool dyn = p.dynOn && meq::typeUsesGain (p.type);
+        const bool dyn = p.dynOn && qtip::typeUsesGain (p.type);
         const float wgt = ch == 0 || ch == 3 ? 1.0f : ch == 4 ? 0.25f : 0.5f;
         for (size_t i = 0; i < np; ++i) weightedDb[i] += wgt * own[i];
 
@@ -443,13 +443,13 @@ void EqDisplay::computeStatic (juce::uint64 key)
     }
 
     // area the selected band's dynamics can sweep, on its channel's curve
-    if (juce::isPositiveAndBelow (selected, meq::kNumBands))
+    if (juce::isPositiveAndBelow (selected, qtip::kNumBands))
     {
         const auto& p = bands[(size_t) selected];
-        if (p.enabled && p.dynOn && meq::typeUsesGain (p.type) && ! bandDb[(size_t) selected].empty())
+        if (p.enabled && p.dynOn && qtip::typeUsesGain (p.type) && ! bandDb[(size_t) selected].empty())
         {
-            meq::Cascade ranged;
-            meq::Engine::designStatic (ranged, p, gainScale, rate, transform, p.range);
+            qtip::Cascade ranged;
+            qtip::Engine::designStatic (ranged, p, gainScale, rate, transform, p.range);
             std::vector<float> r;
             evalInto (ranged, r);
             const auto& base = channelDb[(size_t) (int) p.channel];
@@ -465,18 +465,18 @@ void EqDisplay::computeLive()
     const auto transform = proc.currentTransform();
     const size_t np = pointFreqs.size();
     for (int k = 0; k < 5; ++k) channelLiveDb[(size_t) k] = channelDb[(size_t) k];
-    meq::Cascade live;
-    for (int b = 0; b < meq::kNumBands; ++b)
+    qtip::Cascade live;
+    for (int b = 0; b < qtip::kNumBands; ++b)
     {
         const auto& p = bands[(size_t) b];
-        if (! p.enabled || p.bypass || ! p.dynOn || ! meq::typeUsesGain (p.type) || bandDb[(size_t) b].size() != np) continue;
+        if (! p.enabled || p.bypass || ! p.dynOn || ! qtip::typeUsesGain (p.type) || bandDb[(size_t) b].size() != np) continue;
         const float dyn = proc.liveDynDb (b);
         if (std::abs (dyn) < 0.01f) continue;
-        meq::Engine::designStatic (live, p, gainScale, rate, transform, dyn);
+        qtip::Engine::designStatic (live, p, gainScale, rate, transform, dyn);
         const int ch = (int) p.channel;
         for (size_t i = 0; i < np; ++i)
         {
-            const float d = (pointFreqs[i] < 0.5 * rate ? (float) live.magnitudeDb (2.0 * meq::kPi * pointFreqs[i] / rate) : -120.0f)
+            const float d = (pointFreqs[i] < 0.5 * rate ? (float) live.magnitudeDb (2.0 * qtip::kPi * pointFreqs[i] / rate) : -120.0f)
                           - bandDb[(size_t) b][i];
             for (int k = 0; k < 5; ++k)
                 if (ch == 0 || k == ch) channelLiveDb[(size_t) k][i] += d;
@@ -531,10 +531,10 @@ juce::Point<float> EqDisplay::nodePosition (int b) const
     const auto& p = bands[(size_t) b];
     const float x = xForFreq (juce::jlimit (kMinF, kMaxF, p.freq));
     double db;
-    if (meq::typeUsesGain (p.type) && p.type != meq::FilterType::FlatTilt) db = p.gain * gainScale;
+    if (qtip::typeUsesGain (p.type) && p.type != qtip::FilterType::FlatTilt) db = p.gain * gainScale;
     else db = cascades[(size_t) b].count > 0 && p.freq < 0.5 * rate
-                  ? juce::jmax (-dbRange, (float) cascades[(size_t) b].magnitudeDb (2.0 * meq::kPi * p.freq / rate)) : 0.0;
-    if (p.type == meq::FilterType::Allpass || p.type == meq::FilterType::FlatTilt) db = 0.0;
+                  ? juce::jmax (-dbRange, (float) cascades[(size_t) b].magnitudeDb (2.0 * qtip::kPi * p.freq / rate)) : 0.0;
+    if (p.type == qtip::FilterType::Allpass || p.type == qtip::FilterType::FlatTilt) db = 0.0;
     // keep room above the dot for its audition button
     const float y = juce::jlimit (44.0f, (float) getHeight() - 14.0f, yForDb (db));
     return { x, y };
@@ -594,7 +594,7 @@ void EqDisplay::paintCurves (juce::Graphics& g)
     const auto curveStroke = juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
 
     // every band on its own, in its channel's colour
-    for (int b = 0; b < meq::kNumBands; ++b)
+    for (int b = 0; b < qtip::kNumBands; ++b)
     {
         const auto& p = bands[(size_t) b];
         const auto& own = bandDb[(size_t) b];
@@ -612,7 +612,7 @@ void EqDisplay::paintCurves (juce::Graphics& g)
     }
 
     // dynamic range of the selected band: between its channel's curve and that curve with the range applied
-    if (! selRangeDb.empty() && juce::isPositiveAndBelow (selected, meq::kNumBands))
+    if (! selRangeDb.empty() && juce::isPositiveAndBelow (selected, qtip::kNumBands))
     {
         const auto& base = channelDb[(size_t) (int) bands[(size_t) selected].channel];
         const size_t np = selRangeDb.size();
@@ -732,11 +732,11 @@ void EqDisplay::paint (juce::Graphics& g)
 
     // audition: dim everything outside the band's range
     const int aud = proc.auditionBand.load();
-    if (juce::isPositiveAndBelow (aud, meq::kNumBands) && bands[(size_t) aud].enabled)
+    if (juce::isPositiveAndBelow (aud, qtip::kNumBands) && bands[(size_t) aud].enabled)
     {
         const auto& p = bands[(size_t) aud];
         double lo = 0, hi = 0;
-        using FT = meq::FilterType;
+        using FT = qtip::FilterType;
         switch (p.type)
         {
             case FT::LowCut: case FT::BrickwallLow:   lo = kMinF; hi = p.freq; break;
@@ -760,7 +760,7 @@ void EqDisplay::paint (juce::Graphics& g)
         if (xh < w - 0.5f) g.drawVerticalLine (juce::roundToInt (xh), 0.0f, h);
 
         juce::String text = "Auditioning band " + juce::String (aud + 1) + "  " + params::formatFrequency ((float) p.freq);
-        if (meq::typeUsesGain (p.type)) text << "  Q " << juce::String (p.q, 2);
+        if (qtip::typeUsesGain (p.type)) text << "  Q " << juce::String (p.q, 2);
         g.setFont (theme::mono (11.0f));
         const int tw = juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), text) + 40;
         auto banner = juce::Rectangle<int> (tw, 26).withCentre ({ getWidth() / 2, 25 });
@@ -797,12 +797,12 @@ void EqDisplay::paint (juce::Graphics& g)
 
     // nodes
     const auto speaker = icons::speaker();
-    for (int b = 0; b < meq::kNumBands; ++b)
+    for (int b = 0; b < qtip::kNumBands; ++b)
     {
         const auto& p = bands[(size_t) b];
         if (! p.enabled) continue;
         const auto pos = nodePosition (b);
-        const bool dyn = p.dynOn && meq::typeUsesGain (p.type);
+        const bool dyn = p.dynOn && qtip::typeUsesGain (p.type);
         const bool isSel = b == selected;
         const auto col = theme::channelColour ((int) p.channel);
         const float alpha = p.bypass ? 0.4f : 1.0f;
@@ -846,13 +846,13 @@ void EqDisplay::paint (juce::Graphics& g)
     }
 
     // readout for the selected node (below it, so it never covers the audition button)
-    if (juce::isPositiveAndBelow (selected, meq::kNumBands) && bands[(size_t) selected].enabled && hoverAudition < 0)
+    if (juce::isPositiveAndBelow (selected, qtip::kNumBands) && bands[(size_t) selected].enabled && hoverAudition < 0)
     {
         const auto& p = bands[(size_t) selected];
         const auto pos = nodePosition (selected);
         juce::String text = params::formatFrequency ((float) p.freq);
-        if (meq::typeUsesGain (p.type)) text << "  " << params::formatDb ((float) p.gain) << "  Q " << juce::String (p.q, 2);
-        else if (meq::typeUsesSlope (p.type)) text << "  " << p.slope << " dB/oct";
+        if (qtip::typeUsesGain (p.type)) text << "  " << params::formatDb ((float) p.gain) << "  Q " << juce::String (p.q, 2);
+        else if (qtip::typeUsesSlope (p.type)) text << "  " << p.slope << " dB/oct";
         text << "  " << params::channels[(int) p.channel];
         g.setFont (theme::mono (11.0f));
         const float tw = (float) juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), text) + 18.0f;
@@ -926,7 +926,7 @@ int EqDisplay::nodeAt (juce::Point<float> p) const
 {
     int best = -1;
     float bestD = kNodeRadius + 4.0f;
-    for (int b = 0; b < meq::kNumBands; ++b)
+    for (int b = 0; b < qtip::kNumBands; ++b)
     {
         if (! bands[(size_t) b].enabled) continue;
         const float d = nodePosition (b).getDistanceFrom (p);
@@ -937,7 +937,7 @@ int EqDisplay::nodeAt (juce::Point<float> p) const
 
 int EqDisplay::auditionButtonAt (juce::Point<float> p) const
 {
-    for (int b = 0; b < meq::kNumBands; ++b)
+    for (int b = 0; b < qtip::kNumBands; ++b)
         if (showsAuditionButton (b) && auditionButtonBounds (b).expanded (2.0f).contains (p)) return b;
     return -1;
 }
@@ -979,9 +979,16 @@ void EqDisplay::setParam (int band, const char* suffix, float value)
         p->setValueNotifyingHost (p->convertTo0to1 (value));
 }
 
-void EqDisplay::beginDrag (int band)
+void EqDisplay::beginDrag (int band, bool adjustQ)
 {
     dragBand = band;
+    dragQ = adjustQ;
+    if (dragQ)
+    {
+        dragStartQ = proc.bandValue (band, pb::q);
+        if (auto* p = proc.bandParam (band, pb::q)) p->beginChangeGesture();
+        return;
+    }
     for (auto* s : { pb::freq, pb::gain })
         if (auto* p = proc.bandParam (band, s)) p->beginChangeGesture();
 }
@@ -989,9 +996,17 @@ void EqDisplay::beginDrag (int band)
 void EqDisplay::endDrag()
 {
     if (dragBand < 0) return;
-    for (auto* s : { pb::freq, pb::gain })
-        if (auto* p = proc.bandParam (dragBand, s)) p->endChangeGesture();
+    if (dragQ)
+    {
+        if (auto* p = proc.bandParam (dragBand, pb::q)) p->endChangeGesture();
+    }
+    else
+    {
+        for (auto* s : { pb::freq, pb::gain })
+            if (auto* p = proc.bandParam (dragBand, s)) p->endChangeGesture();
+    }
     dragBand = -1;
+    dragQ = false;
 }
 
 void EqDisplay::mouseMove (const juce::MouseEvent& e)
@@ -1043,7 +1058,9 @@ void EqDisplay::mouseDown (const juce::MouseEvent& e)
     {
         if (onSelect) onSelect (node);
         if (e.mods.isPopupMenu()) { showBandMenu (node); return; }
-        beginDrag (node);
+        // Ctrl-drag (Cmd on macOS) changes Q; a plain drag moves the band
+        dragStartY = e.position.y;
+        beginDrag (node, e.mods.isCommandDown());
         return;
     }
 
@@ -1053,7 +1070,7 @@ void EqDisplay::mouseDown (const juce::MouseEvent& e)
     if (spectrumGrabOn && ! frozen && findPeakNear (e.position, f, db))
     {
         // Spectrum Grab: a narrow bell on the peak, then keep dragging it
-        const int b = proc.addBand (meq::FilterType::Bell, (float) f, 0.0f, 6.0f);
+        const int b = proc.addBand (qtip::FilterType::Bell, (float) f, 0.0f, 6.0f);
         if (b >= 0)
         {
             bands[(size_t) b] = proc.readBand (b);
@@ -1071,10 +1088,22 @@ void EqDisplay::mouseDrag (const juce::MouseEvent& e)
 {
     if (dragBand < 0) return;
     const auto type = bands[(size_t) dragBand].type;
-    // shift: gain only (frequency stays where it is)
-    if (! e.mods.isShiftDown())
+    if (dragQ)
+    {
+        // up = narrower (higher Q), down = wider; one octave of Q per 50 px
+        const float q = dragStartQ * std::pow (2.0f, (dragStartY - e.position.y) / 50.0f);
+        setParam (dragBand, pb::q, juce::jlimit (0.025f, 40.0f, q));
+        bands[(size_t) dragBand] = proc.readBand (dragBand);
+        rebuildCurves();
+        repaint();
+        return;
+    }
+    // Shift: vertical only (gain); Alt: horizontal only (frequency)
+    const bool lockFreq = e.mods.isShiftDown();
+    const bool lockGain = e.mods.isAltDown() && ! lockFreq;
+    if (! lockFreq)
         setParam (dragBand, pb::freq, (float) juce::jlimit (10.0, 22000.0, freqForX (e.position.x)));
-    if (meq::typeUsesGain (type))
+    if (qtip::typeUsesGain (type) && ! lockGain)
     {
         const double g = dbForY (e.position.y) / juce::jmax (0.05, std::abs (gainScale)) * (gainScale < 0 ? -1 : 1);
         setParam (dragBand, pb::gain, (float) juce::jlimit (-30.0, 30.0, std::round (g * 10.0) / 10.0));
@@ -1104,7 +1133,7 @@ void EqDisplay::mouseDoubleClick (const juce::MouseEvent& e)
     }
     const double f = freqForX (e.position.x);
     const double g = juce::jlimit (-30.0, 30.0, dbForY (e.position.y));
-    const int b = proc.addBand (meq::FilterType::Bell, (float) f, (float) (std::round (g * 10.0) / 10.0), 1.0f);
+    const int b = proc.addBand (qtip::FilterType::Bell, (float) f, (float) (std::round (g * 10.0) / 10.0), 1.0f);
     if (b >= 0 && onSelect) onSelect (b);
 }
 
@@ -1127,12 +1156,12 @@ void EqDisplay::showBandMenu (int band)
     juce::PopupMenu types, channels, menu;
     const int curType = juce::roundToInt (proc.bandValue (band, pb::type));
     const int curCh = juce::roundToInt (proc.bandValue (band, pb::channel));
-    for (int t = 0; t < (int) meq::FilterType::Count; ++t)
+    for (int t = 0; t < (int) qtip::FilterType::Count; ++t)
     {
-        juce::PopupMenu::Item item (meq::filterTypeName ((meq::FilterType) t));
+        juce::PopupMenu::Item item (qtip::filterTypeName ((qtip::FilterType) t));
         item.itemID = 100 + t;
         item.isTicked = t == curType;
-        item.image = filtericons::drawable ((meq::FilterType) t, theme::channelColour (curCh));
+        item.image = filtericons::drawable ((qtip::FilterType) t, theme::channelColour (curCh));
         types.addItem (std::move (item));
     }
     const char* chNames[] = { "Stereo", "Left", "Right", "Mid", "Side" };
@@ -1148,7 +1177,7 @@ void EqDisplay::showBandMenu (int band)
     menu.addSectionHeader ("Band " + juce::String (band + 1));
     menu.addSubMenu ("Type", types);
     menu.addSubMenu ("Process", channels);
-    menu.addItem (1, "Dynamic", meq::typeUsesGain ((meq::FilterType) curType), proc.bandValue (band, pb::dyn) > 0.5f);
+    menu.addItem (1, "Dynamic", qtip::typeUsesGain ((qtip::FilterType) curType), proc.bandValue (band, pb::dyn) > 0.5f);
     menu.addItem (2, "Bypass", true, proc.bandValue (band, pb::bypass) > 0.5f);
     menu.addItem (3, "Audition", true, proc.lockedSolo == band);
     menu.addSeparator();

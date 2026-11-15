@@ -6,9 +6,9 @@ namespace filtericons
 
 namespace
 {
-    meq::BandDesign typical (meq::FilterType t)
+    qtip::BandDesign typical (qtip::FilterType t)
     {
-        using FT = meq::FilterType;
+        using FT = qtip::FilterType;
         switch (t)
         {
             case FT::Bell:             return { t, 1000, 9, 1.2, 12 };
@@ -32,11 +32,11 @@ namespace
     }
 }
 
-juce::Path curve (meq::FilterType type, juce::Rectangle<float> area)
+juce::Path curve (qtip::FilterType type, juce::Rectangle<float> area)
 {
     constexpr double fs = 48000.0, range = 15.0;
-    meq::Cascade c;
-    meq::designBand (c, typical (type), fs, meq::Transform::Matched);
+    qtip::Cascade c;
+    qtip::designBand (c, typical (type), fs, qtip::Transform::Matched);
 
     juce::Path p;
     const int n = 48;
@@ -44,18 +44,18 @@ juce::Path curve (meq::FilterType type, juce::Rectangle<float> area)
     for (int i = 0; i <= n; ++i)
     {
         const double f = 30.0 * std::pow (600.0, (double) i / n);
-        const double w = 2.0 * meq::kPi * f / fs;
+        const double w = 2.0 * qtip::kPi * f / fs;
         double v;
-        if (type == meq::FilterType::Allpass)
+        if (type == qtip::FilterType::Allpass)
         {
             // allpass: draw its phase sweep (0 to -360 degrees) instead of a flat line
             const double ph = std::arg (c.response (w));
             double d = ph - prev;
-            while (d > meq::kPi) d -= 2 * meq::kPi;
-            while (d < -meq::kPi) d += 2 * meq::kPi;
+            while (d > qtip::kPi) d -= 2 * qtip::kPi;
+            while (d < -qtip::kPi) d += 2 * qtip::kPi;
             unwrap = (i == 0) ? ph : unwrap + d;
             prev = ph;
-            v = range * (1.0 + unwrap / meq::kPi) * 0.8; // 0..-2pi mapped to +range..-range
+            v = range * (1.0 + unwrap / qtip::kPi) * 0.8; // 0..-2pi mapped to +range..-range
         }
         else
         {
@@ -68,7 +68,7 @@ juce::Path curve (meq::FilterType type, juce::Rectangle<float> area)
     return p;
 }
 
-std::unique_ptr<juce::Drawable> drawable (meq::FilterType type, juce::Colour colour)
+std::unique_ptr<juce::Drawable> drawable (qtip::FilterType type, juce::Colour colour)
 {
     auto d = std::make_unique<juce::DrawablePath>();
     d->setPath (curve (type, { 0, 0, 30, 16 }));
@@ -78,7 +78,7 @@ std::unique_ptr<juce::Drawable> drawable (meq::FilterType type, juce::Colour col
     return d;
 }
 
-void draw (juce::Graphics& g, meq::FilterType type, juce::Rectangle<float> area, juce::Colour colour, float thickness)
+void draw (juce::Graphics& g, qtip::FilterType type, juce::Rectangle<float> area, juce::Colour colour, float thickness)
 {
     g.setColour (colour.withAlpha (0.18f));
     g.drawHorizontalLine (juce::roundToInt (area.getCentreY()), area.getX(), area.getRight());
@@ -89,12 +89,12 @@ void draw (juce::Graphics& g, meq::FilterType type, juce::Rectangle<float> area,
 juce::PopupMenu menu (int currentType, juce::Colour colour)
 {
     juce::PopupMenu m;
-    for (int t = 0; t < (int) meq::FilterType::Count; ++t)
+    for (int t = 0; t < (int) qtip::FilterType::Count; ++t)
     {
-        juce::PopupMenu::Item item (meq::filterTypeName ((meq::FilterType) t));
+        juce::PopupMenu::Item item (qtip::filterTypeName ((qtip::FilterType) t));
         item.itemID = 1 + t;
         item.isTicked = t == currentType;
-        item.image = drawable ((meq::FilterType) t, colour);
+        item.image = drawable ((qtip::FilterType) t, colour);
         m.addItem (std::move (item));
     }
     return m;
@@ -115,7 +115,7 @@ void TypeSelector::attach (juce::RangedAudioParameter* p)
     if (p == nullptr) return;
     attachment = std::make_unique<juce::ParameterAttachment> (*p, [this] (float v)
     {
-        current = juce::jlimit (0, (int) meq::FilterType::Count - 1, juce::roundToInt (v));
+        current = juce::jlimit (0, (int) qtip::FilterType::Count - 1, juce::roundToInt (v));
         repaint();
     }, nullptr);
     attachment->sendInitialUpdate();
@@ -133,11 +133,11 @@ void TypeSelector::paint (juce::Graphics& g)
 
     auto inner = getLocalBounds().reduced (8, 4);
     const auto iconArea = inner.removeFromLeft (34).toFloat().reduced (0, 3);
-    filtericons::draw (g, (meq::FilterType) current, iconArea, colour.isTransparent() ? theme::accent : colour);
+    filtericons::draw (g, (qtip::FilterType) current, iconArea, colour.isTransparent() ? theme::accent : colour);
     inner.removeFromLeft (8);
     g.setColour (theme::text);
     g.setFont (theme::font (13.0f, true));
-    g.drawText (meq::filterTypeName ((meq::FilterType) current), inner.withTrimmedRight (16), juce::Justification::centredLeft);
+    g.drawText (qtip::filterTypeName ((qtip::FilterType) current), inner.withTrimmedRight (16), juce::Justification::centredLeft);
 
     juce::Path arrow;
     const float ax = (float) getWidth() - 14.0f, ay = (float) getHeight() * 0.5f;

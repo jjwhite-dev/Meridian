@@ -1,6 +1,6 @@
 #include "PluginEditor.h"
 
-MeridianEditor::MeridianEditor (MeridianProcessor& p)
+QTipEditor::QTipEditor (QTipProcessor& p)
     : AudioProcessorEditor (p), proc (p), header (p), display (p), strip (p), bandPanel (p), dynamicsPanel (p),
       globalPanel (p), settingsPanel (*settings)
 {
@@ -35,7 +35,7 @@ MeridianEditor::MeridianEditor (MeridianProcessor& p)
     // every click starts a new undo step; listen to clicks anywhere in the editor
     addMouseListener (this, true);
 
-    for (int b = 0; b < meq::kNumBands; ++b)
+    for (int b = 0; b < qtip::kNumBands; ++b)
         if (proc.bandValue (b, params::band::on) > 0.5f) { selectBand (b); break; }
 
     setResizable (true, true);
@@ -43,7 +43,7 @@ MeridianEditor::MeridianEditor (MeridianProcessor& p)
     applySettings();
 }
 
-MeridianEditor::~MeridianEditor()
+QTipEditor::~QTipEditor()
 {
     settings->removeChangeListener (this);
     stopTimer();
@@ -52,12 +52,12 @@ MeridianEditor::~MeridianEditor()
     setLookAndFeel (nullptr);
 }
 
-void MeridianEditor::changeListenerCallback (juce::ChangeBroadcaster*)
+void QTipEditor::changeListenerCallback (juce::ChangeBroadcaster*)
 {
     applySettings();
 }
 
-void MeridianEditor::applySettings()
+void QTipEditor::applySettings()
 {
     auto& s = *settings;
     lnf.applyTheme();
@@ -94,13 +94,13 @@ void MeridianEditor::applySettings()
     repaintAll (*this);
 }
 
-void MeridianEditor::setGpuRendering (bool shouldUseGpu)
+void QTipEditor::setGpuRendering (bool shouldUseGpu)
 {
     if (shouldUseGpu && ! glContext.isAttached()) glContext.attachTo (*this);
     else if (! shouldUseGpu && glContext.isAttached()) glContext.detach();
 }
 
-void MeridianEditor::selectBand (int band)
+void QTipEditor::selectBand (int band)
 {
     selected = band;
     display.setSelected (band);
@@ -110,17 +110,17 @@ void MeridianEditor::selectBand (int band)
     dynamicsPanel.setBand (band);
 }
 
-void MeridianEditor::undo()
+void QTipEditor::undo()
 {
     proc.undoManager.undo();
 }
 
-void MeridianEditor::redo()
+void QTipEditor::redo()
 {
     proc.undoManager.redo();
 }
 
-bool MeridianEditor::keyPressed (const juce::KeyPress& key)
+bool QTipEditor::keyPressed (const juce::KeyPress& key)
 {
     const auto mods = key.getModifiers();
     if (mods.isCommandDown() && key.getKeyCode() == 'Z')
@@ -137,13 +137,13 @@ bool MeridianEditor::keyPressed (const juce::KeyPress& key)
     return false;
 }
 
-void MeridianEditor::mouseDown (const juce::MouseEvent&)
+void QTipEditor::mouseDown (const juce::MouseEvent&)
 {
     // reached for clicks anywhere (we listen to all children): group what follows into one undo step
     proc.undoManager.beginNewTransaction();
 }
 
-void MeridianEditor::timerCallback()
+void QTipEditor::timerCallback()
 {
     proc.presets.tick();
     if (selected >= 0 && proc.bandValue (selected, params::band::on) < 0.5f)
@@ -156,12 +156,12 @@ void MeridianEditor::timerCallback()
     globalPanel.update();
 }
 
-void MeridianEditor::paint (juce::Graphics& g)
+void QTipEditor::paint (juce::Graphics& g)
 {
     g.fillAll (theme::bg);
 }
 
-void MeridianEditor::resized()
+void QTipEditor::resized()
 {
     const float sc = appliedScale > 0.0f ? appliedScale : 1.0f;
     const int lw = juce::roundToInt ((float) getWidth() / sc);
@@ -176,7 +176,7 @@ void MeridianEditor::resized()
     }
 }
 
-void MeridianEditor::layoutRoot()
+void QTipEditor::layoutRoot()
 {
     auto r = root.getLocalBounds();
     settingsPanel.setBounds (r);

@@ -6,13 +6,13 @@
 namespace filtericons
 {
     /** The filter's typical curve (magnitude; phase for Allpass), fitted into `area`. */
-    juce::Path curve (meq::FilterType type, juce::Rectangle<float> area);
+    juce::Path curve (qtip::FilterType type, juce::Rectangle<float> area);
 
     /** The icon as a Drawable, for popup menus. */
-    std::unique_ptr<juce::Drawable> drawable (meq::FilterType type, juce::Colour colour);
+    std::unique_ptr<juce::Drawable> drawable (qtip::FilterType type, juce::Colour colour);
 
     /** Draws a small framed icon. */
-    void draw (juce::Graphics& g, meq::FilterType type, juce::Rectangle<float> area, juce::Colour colour, float thickness = 1.5f);
+    void draw (juce::Graphics& g, qtip::FilterType type, juce::Rectangle<float> area, juce::Colour colour, float thickness = 1.5f);
 
     /** Popup menu of all filter types with their icons. Item ids are 1 + type index. */
     juce::PopupMenu menu (int currentType, juce::Colour colour);

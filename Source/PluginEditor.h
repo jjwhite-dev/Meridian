@@ -10,13 +10,13 @@
 #include "ui/Panels.h"
 #include "ui/SettingsPanel.h"
 
-class MeridianEditor : public juce::AudioProcessorEditor,
+class QTipEditor : public juce::AudioProcessorEditor,
                        private juce::Timer,
                        private juce::ChangeListener
 {
 public:
-    explicit MeridianEditor (MeridianProcessor&);
-    ~MeridianEditor() override;
+    explicit QTipEditor (QTipProcessor&);
+    ~QTipEditor() override;
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -43,9 +43,9 @@ private:
     void undo();
     void redo();
 
-    MeridianProcessor& proc;
+    QTipProcessor& proc;
     juce::SharedResourcePointer<GlobalSettings> settings; // must exist before the look and feel (it applies the theme)
-    MeridianLookAndFeel lnf;
+    QTipLookAndFeel lnf;
     juce::OpenGLContext glContext;
     juce::TooltipWindow tooltips { this, 700 };
 
@@ -65,5 +65,5 @@ private:
 
     static constexpr int minLogicalW = 1100, minLogicalH = 680;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MeridianEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (QTipEditor)
 };

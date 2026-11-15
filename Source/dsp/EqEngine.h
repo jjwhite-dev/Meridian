@@ -1,4 +1,4 @@
-// Meridian EQ - processing engine (pure C++17, no JUCE).
+// Q-TIP - processing engine (pure C++17, no JUCE).
 //
 // 32 bands, each with its own filter shape, channel (stereo / left / right /
 // mid / side) and optional dynamics. Runs in double precision. The JUCE
@@ -12,7 +12,7 @@
 #include <atomic>
 #include <vector>
 
-namespace meq
+namespace qtip
 {
 
 constexpr int kNumBands = 32;
@@ -158,4 +158,4 @@ private:
     std::atomic<float> liveAuto { 0.0f };
 };
 
-} // namespace meq
+} // namespace qtip
