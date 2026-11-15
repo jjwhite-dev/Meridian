@@ -1,0 +1,68 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  dsp-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure (tests only, no JUCE)
+        run: cmake -S . -B build-tests -DMERIDIAN_TESTS_ONLY=ON -DCMAKE_BUILD_TYPE=Release
+      - name: Build tests
+        run: cmake --build build-tests --parallel
+      - name: Run tests
+        run: ctest --test-dir build-tests --output-on-failure
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure
+        run: cmake -S . -B build -A x64
+
+      - name: Build VST3
+        run: cmake --build build --config Release --target MeridianEQ_VST3 --parallel
+
+      - name: Collect the plugin
+        shell: pwsh
+        run: |
+          $vst = Get-ChildItem -Path build -Recurse -Directory -Filter "Meridian EQ.vst3" | Select-Object -First 1
+          if (-not $vst) { throw "VST3 bundle not found" }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item -Recurse -Path $vst.FullName -Destination dist
+          Copy-Item -Path README.md -Destination dist
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: Meridian-EQ-VST3-Windows
+          path: dist
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+
+      - name: Build VST3 and AU
+        run: cmake --build build --config Release --target MeridianEQ_VST3 MeridianEQ_AU --parallel
+
+      - name: Collect the plugins
+        run: |
+          mkdir -p dist
+          vst=$(find build -type d -name "Meridian EQ.vst3" | head -n 1)
+          au=$(find build -type d -name "Meridian EQ.component" | head -n 1)
+          test -n "$vst" && test -n "$au"
+          cp -R "$vst" "$au" dist/
+          cp README.md dist/
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: Meridian-EQ-macOS
+          path: dist

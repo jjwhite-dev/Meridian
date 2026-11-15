@@ -9,7 +9,7 @@ below).
 ## Install
 
 1. Open the **Actions** tab on GitHub, pick the latest successful
-   **Meridian EQ** run and download `Meridian-EQ-VST3-Windows` or
+   **Build** run and download `Meridian-EQ-VST3-Windows` or
    `Meridian-EQ-macOS`.
 2. Windows: copy `Meridian EQ.vst3` to `C:\Program Files\Common Files\VST3\`.
    macOS: copy `Meridian EQ.vst3` to `~/Library/Audio/Plug-Ins/VST3/` and
@@ -127,14 +127,14 @@ Needs CMake 3.22+ and a C++17 compiler. JUCE 8.0.10 is downloaded
 automatically (or pass `-DMERIDIAN_JUCE_DIR=/path/to/JUCE`).
 
 ```
-cmake -S MeridianEQ -B build
+cmake -S . -B build
 cmake --build build --config Release --target MeridianEQ_VST3
 ```
 
 The DSP has unit tests that need no JUCE:
 
 ```
-cmake -S MeridianEQ -B build-tests -DMERIDIAN_TESTS_ONLY=ON
+cmake -S . -B build-tests -DMERIDIAN_TESTS_ONLY=ON
 cmake --build build-tests
 ctest --test-dir build-tests --output-on-failure
 ```
